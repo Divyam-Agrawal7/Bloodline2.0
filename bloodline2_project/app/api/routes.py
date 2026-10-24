@@ -348,7 +348,7 @@ def list_detected_mules():
     return {"mules": mules, "total_count": len(mules), "is_simulated": True}
 
 @router.get("/transactions", summary="List live transaction ledger feed (Bloodline 2.0)")
-def list_live_transactions(limit: int = 150, chain_id: Optional[str] = None):
+def list_live_transactions(limit: int = 150, chain_id: Optional[str] = None, mule_only: bool = False):
     conn = engine._get_conn()
     cursor = conn.cursor()
     query = """
@@ -361,9 +361,14 @@ def list_live_transactions(limit: int = 150, chain_id: Optional[str] = None):
         LEFT JOIN accounts r ON t.receiver = r.id
     """
     params = []
+    where = []
     if chain_id:
-        query += " WHERE t.chain_id = ? "
+        where.append("t.chain_id = ?")
         params.append(chain_id)
+    if mule_only:
+        where.append("t.is_mule_flow = 1")
+    if where:
+        query += " WHERE " + " AND ".join(where) + " "
     query += " ORDER BY t.epoch_seconds DESC LIMIT ? "
     params.append(limit)
 

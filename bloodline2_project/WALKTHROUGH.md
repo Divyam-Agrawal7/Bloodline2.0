@@ -128,3 +128,23 @@ Chain 8 Robustness Hold  16 / 18 mules (88.9%)  6 / 18 mules (33.3%)   Robust to
   - *"Simulated data"* badge rendered in sticky top bar on all screens.
   - *"Demonstration only, not legal advice"* rendered in statutory footer with live RBI reference links.
   - All interventions labeled as *"administrative hold"* or *"lien request"*; zero autonomous classifications.
+
+---
+
+## 🔬 Enhanced Money DNA, Live Transactions, and Detected Mules Panels
+
+### 1. Money DNA Directional Fund Flow Graph
+- **Topological DAG Layout**: Automatic assignment of canonical layers (Layer 0: Stolen Origin, Layer 1: Aggregator Hubs, Layer 2: Dispersal Hops, Layer 3: Cash-Out Exits) ensuring zero node duplicates and strict forward flow.
+- **Directional Bézier Arrows**: Smooth cubic Bézier curvature with animated fluid particles (`animate stroke-dashoffset`), arrowheads (`url(#arrow-crimson)`, `url(#arrow-emerald)`, `url(#arrow-cyan)`), and centered amount badges (e.g. ₹89,000).
+- **Syndicate Chain Selector**: Analysts can seamlessly choose from 16 syndicate chains (`CH01` through `CH15` and `VENDORATK`) with transaction volume and hop counts displayed.
+- **Pure HTML Node Cards + Overlaid SVG**: Eliminates WebKit/Safari `<foreignObject>` rendering quirks, providing 100% reliable interactive hold buttons and instant forensic profile inspection.
+
+### 2. Live Transactions Feed Panel
+- **Real-Time Network Ledger**: Displays all transactions with sender/receiver details, amounts, channels (IMPS, UPI, NEFT, RTGS), and live status (`HELD (LIEN)`, `MULE DISPERSAL`, `CLEARED`).
+- **Instant Search & Filters**: Search by Txn ID, Sender/Receiver names or IDs, and filter by Mule Flows or Held items.
+- **One-Click Inspection**: Clicking "Inspect" switches automatically to the Money DNA view, selects that transaction's syndicate chain, and highlights the counterparty node.
+
+### 3. Detected Mules Master Directory
+- **Comprehensive Registry**: Lists all 91 detected mules across all 15 syndicate chains with calibrated ML risk scores, syndicate chain IDs, KYC tiers, and current balances.
+- **Device Cluster Signals**: Highlights linked hardware fingerprints and shared devices.
+- **One-Click Action & Hold**: Analysts can place immediate administrative lien holds or view any mule directly in the Money DNA DAG tracer.

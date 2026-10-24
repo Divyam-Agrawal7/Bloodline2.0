@@ -184,6 +184,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 1.2rem 16px 3rem; }
 .dna-link.held { stroke: var(--held); }
 .dna-link.off { stroke: var(--border-strong); stroke-dasharray: 4 4; }
 .dna-link.now { stroke-width: 4; }
+.dna-link.target { stroke: var(--info); stroke-width: 4.5; }
 .dna-hit { fill: none; stroke: transparent; stroke-width: 12; cursor: help; }
 .dna-col { fill: var(--surface); opacity: .8; }
 .dna-head { fill: var(--text); font-size: 12px; font-weight: 700; }
@@ -401,9 +402,16 @@ main { max-width: 1320px; margin: 0 auto; padding: 1.2rem 16px 3rem; }
       <div class="grid g-5-7">
         <form class="card" id="scan-form">
           <h3>Make a test transfer</h3>
-          <div class="eyebrow" style="margin-top:.6rem">Test scenarios</div>
-          <div class="scenarios" id="scan-scenarios"></div>
-          <div class="field" style="margin-top:1rem"><label for="sc-payee">Beneficiary account</label><input id="sc-payee" type="text" class="mono" required></div>
+          <div class="row" style="margin-top:.6rem">
+            <div class="subtabs" id="sc-src">
+              <button type="button" class="btn sm on" data-src="mules">Detected mules <span id="sc-mule-count"></span></button>
+              <button type="button" class="btn sm" data-src="legit">Verified merchants</button>
+            </div>
+            <span class="spacer"></span>
+            <button type="button" class="btn sm" id="sc-refresh" aria-label="Refresh detected mules">Refresh</button>
+          </div>
+          <div class="scenarios scroll" id="scan-scenarios" style="max-height:236px;margin-top:.6rem"></div>
+          <div class="field" style="margin-top:1rem"><div class="row" style="margin-bottom:.3rem"><label for="sc-payee" style="margin:0">Beneficiary account</label><span class="spacer"></span><span class="badge s-ok hidden" id="sc-held">Lien hold active</span></div><input id="sc-payee" type="text" class="mono" required></div>
           <div class="field"><label for="sc-amount">Amount (₹)</label><input id="sc-amount" type="number" min="1" step="0.01" required></div>
           <div class="field"><label for="sc-sender">Sender account (optional)</label><input id="sc-sender" type="text" class="mono" placeholder="e.g. ACC00001"></div>
           <div class="field"><label for="sc-remark">Remark</label><input id="sc-remark" type="text" value="Contractor urgent advance"></div>
@@ -912,7 +920,7 @@ function startAdmin() {
 const tabLoaders = {
   "a-review": () => loadReview(),
   "a-settings": () => loadSettings(),
-  "a-scan": () => { if (!scanned) runScan(SCENARIOS[0].id, SCENARIOS[0].amount); },
+  "a-scan": async () => { await loadScanMules(); if (!scanned && scanMules[0]) runScan(scanMules[0].id, muleAmount(scanMules[0])); },
   "a-analyst": () => loadAnalyst(),
   "a-cases": () => loadCases(),
   "a-shield": () => loadInvoices(),
@@ -1012,7 +1020,7 @@ document.addEventListener("click", async e => {
     } catch (err) { toast(err.message); }
     loadReview();
     if (!$("#drawer").classList.contains("hidden")) investigate(id);
-    if (adminTab === "a-scan" && scanned?.account_id === id) renderScanActions(id);
+    if (adminTab === "a-scan") { await loadScanMules(); if (scanned?.account_id === id) renderScanActions(id); }
     if (adminTab === "a-analyst") { if (dna.data) loadDNA(dna.chain, true); if (dna.sel === id) inspectNode(id); if (!$("#an-mules").classList.contains("hidden")) loadMules(); }
     return;
   }
@@ -1064,20 +1072,48 @@ function shapBars(reasons) {
   }).join("");
 }
 
-const SCENARIOS = [
-  { id: "ACC02228", label: "Neha Bose", desc: "Mule L1 hub · CH03", amount: 95000, risk: "High risk" },
-  { id: "ACC02233", label: "Nisha Rao", desc: "Layer 2 dispersal", amount: 82700, risk: "High risk" },
-  { id: "ACC02041", label: "Reddy Stores", desc: "Merchant shopkeeper", amount: 1500, risk: "Legitimate" },
-  { id: "ACC02108", label: "Arjun Bose", desc: "New genuine customer", amount: 12000, risk: "Legitimate" },
+const LEGIT = [
+  { id: "ACC00053", label: "Divya Hegde", desc: "Private wealth client", amount: 450 },
+  { id: "ACC02041", label: "Reddy Stores", desc: "Verified retail merchant", amount: 1250 },
+  { id: "ACC01370", label: "Pooja Patel", desc: "Salaried executive", amount: 5000 },
 ];
-let scanned = null;
-$("#scan-scenarios").innerHTML = SCENARIOS.map(s => `<button type="button" class="scenario" data-sc="${s.id}"><b>${esc(s.label)}</b><span class="muted">${esc(s.desc)}</span><div class="row" style="justify-content:space-between;margin-top:.2rem"><span class="mono">${inrShort(s.amount)}</span>${badge(s.risk === "High risk" ? "r-high" : "r-low", s.risk)}</div></button>`).join("");
-$("#scan-scenarios").addEventListener("click", e => { const b = e.target.closest("[data-sc]"); if (!b) return; const s = SCENARIOS.find(x => x.id === b.dataset.sc); runScan(s.id, s.amount); });
+const muleAmount = m => m.layer === 1 ? 95000 : m.layer === 2 ? 82700 : 120000;
+let scanned = null, scanMules = [], scanSrc = "mules";
+async function loadScanMules() {
+  $("#sc-refresh").disabled = true;
+  scanMules = (await det("mules").catch(() => ({ mules: [] }))).mules;
+  $("#sc-refresh").disabled = false;
+  $("#sc-mule-count").textContent = `(${scanMules.length})`;
+  renderScenarios(); syncHeldMarker();
+}
+function renderScenarios() {
+  const cur = $("#sc-payee").value.trim();
+  $("#scan-scenarios").innerHTML = scanSrc === "mules"
+    ? scanMules.slice(0, 10).map(m => `<button type="button" class="scenario ${m.id === cur ? "on" : ""}" data-sc="${esc(m.id)}" data-amt="${muleAmount(m)}">
+        <div class="row" style="justify-content:space-between"><span class="mono xs"><b style="display:inline">${esc(m.id)}</b></span>${m.is_held ? badge("s-ok", "Held") : badge("s-neutral", m.chain_id || "–")}</div>
+        <b>${esc(m.pseudonymous_label)}</b>
+        <div class="row" style="justify-content:space-between;margin-top:.2rem"><span class="muted xs">Layer ${m.layer}</span>${badge("r-high", score(m.mule_score) + " risk")}</div></button>`).join("") || `<div class="empty">No detected mules.</div>`
+    : LEGIT.map(s => `<button type="button" class="scenario ${s.id === cur ? "on" : ""}" data-sc="${s.id}" data-amt="${s.amount}">
+        <div class="row" style="justify-content:space-between"><span class="mono xs"><b style="display:inline">${esc(s.id)}</b></span>${badge("r-low", "Clean")}</div>
+        <b>${esc(s.label)}</b><div class="row" style="justify-content:space-between;margin-top:.2rem"><span class="muted xs">${esc(s.desc)}</span><span class="mono xs">${inrShort(s.amount)}</span></div></button>`).join("");
+}
+function syncHeldMarker() {
+  const m = scanMules.find(x => x.id === $("#sc-payee").value.trim());
+  $("#sc-held").classList.toggle("hidden", !m?.is_held);
+}
+$("#sc-src").addEventListener("click", e => {
+  const b = e.target.closest("[data-src]"); if (!b) return;
+  scanSrc = b.dataset.src; $$("#sc-src .btn").forEach(x => x.classList.toggle("on", x === b)); renderScenarios();
+});
+$("#sc-refresh").onclick = loadScanMules;
+$("#sc-payee").addEventListener("input", syncHeldMarker);
+$("#scan-scenarios").addEventListener("click", e => { const b = e.target.closest("[data-sc]"); if (b) runScan(b.dataset.sc, +b.dataset.amt); });
 $("#scan-form").addEventListener("submit", e => { e.preventDefault(); runScan($("#sc-payee").value.trim(), +$("#sc-amount").value); });
 
 async function runScan(payee, amount) {
   $("#sc-payee").value = payee; $("#sc-amount").value = amount; $("#sc-err").textContent = "";
   $$(".scenario").forEach(b => b.classList.toggle("on", b.dataset.sc === payee));
+  syncHeldMarker();
   $("#sc-go").disabled = true; $("#sc-go").textContent = "Evaluating live model…";
   try {
     const body = { payee_account_id: payee, amount, remark: $("#sc-remark").value };
@@ -1116,7 +1152,10 @@ function renderScan(d, amount) {
 }
 async function renderScanActions(id) {
   const status = await currentStatus(id), el = $("#scan-actions"); if (!el) return;
-  el.innerHTML = `<span class="small muted">Bank review:</span> ${statusBadge(status)} ${actionButtons(id, status)}<span class="spacer"></span><button class="btn sm" data-dna-acc="${esc(id)}">Trace in Money DNA</button>`;
+  const held = scanMules.find(m => m.id === id)?.is_held;
+  el.innerHTML = `<span class="small muted">Bank review:</span> ${statusBadge(status)} ${actionButtons(id, status)}<span class="spacer"></span>
+    ${held ? badge("s-ok", "Lien hold active") : `<button class="btn sm primary" data-act="block" data-id="${esc(id)}">Place lien hold</button>`}
+    <button class="btn sm" data-dna-acc="${esc(id)}">Trace in Money DNA</button>`;
 }
 const hopCard = h => `<div class="hop"><div class="row"><strong class="mono">${esc(h.account_id)}</strong><span class="spacer"></span><strong style="color:var(--med)">${score(h.probability)}</strong></div>
   <div>${esc(h.label || "")}</div><div class="muted xs">${esc(h.reason || "")}${h.is_held ? " · held" : ""}</div></div>`;
@@ -1135,23 +1174,20 @@ $("#an-sub").addEventListener("click", e => {
 });
 
 async function loadAnalyst() {
-  if (!dna.chains.length) {
-    try {
-      dna.chains = (await det("chains")).chains;
-      $("#dna-chain").innerHTML = dna.chains.map(c => `<option value="${esc(c.chain_id)}">${esc(c.chain_id)} · ${c.transfers} transfers · ${inrShort(c.volume)}</option>`).join("");
-    } catch (err) { $("#dna-canvas").innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
-  }
-  if (!dna.data) loadDNA(dna.chain || "CH03");
+  if (!dna.data) await loadDNA(dna.chain || "CH03");
 }
-$("#dna-chain").addEventListener("change", () => loadDNA($("#dna-chain").value));
+$("#dna-chain").addEventListener("change", () => loadDNA($("#dna-chain").value.replace(/^TXN:/, "")));
 
-async function loadDNA(chain, keepStep) {
+async function loadDNA(ref, keepStep) {
   dnaPause();
   try {
-    const d = await det("lineage/" + encodeURIComponent(chain));
+    const d = await det("lineage/" + encodeURIComponent(ref));
     d.links.sort((a, b) => a.epoch_seconds - b.epoch_seconds);
     const prevLen = dna.data?.links.length;
-    dna.chain = d.chain_id; dna.data = d;
+    d.chain_id = d.active_chain || d.chain_id;
+    dna.chain = d.chain_id.startsWith("TXN:") ? d.target_txn_id : d.chain_id; dna.data = d;
+    dna.chains = d.available_chains || dna.chains;
+    $("#dna-chain").innerHTML = dna.chains.map(c => `<option value="${esc(c.chain_id)}">${esc(c.label || c.chain_id)}</option>`).join("");
     if (!keepStep || prevLen !== d.links.length) dna.step = d.links.length;
     $("#dna-chain").value = d.chain_id;
     $("#dna-slider").max = d.links.length; $("#dna-slider").value = dna.step;
@@ -1184,9 +1220,9 @@ function renderDNA() {
     const a = pos[l.source], b = pos[l.target]; if (!a || !b) return;
     const x1 = a.x + cardW, y1 = a.y + cardH / 2, x2 = b.x - 2, y2 = b.y + cardH / 2, dx = Math.abs(x2 - x1) * .45;
     const path = `M${x1} ${y1} C${x1 + dx} ${y1} ${x2 - dx} ${y2} ${x2} ${y2}`;
-    const on = i < dna.step, held = on && (l.is_held || b.n.is_held), cls = !on ? "off" : held ? "held" : "on";
+    const on = i < dna.step, held = on && (l.is_held || b.n.is_held), cls = !on ? "off" : held ? "held" : "on" + (l.is_target_txn ? " target" : "");
     const tip = `<b>${esc(l.source_account)} → ${esc(l.target_account)}</b><br>${inr(l.amount)} · ${esc(l.channel)}<br>${esc(isoShort(l.timestamp))}${on ? "" : "<br><i>not yet replayed</i>"}`;
-    s += `<path class="dna-link ${cls}${i === dna.step - 1 ? " now" : ""}" d="${path}" marker-end="url(#arr-${cls})"/><path class="dna-hit" d="${path}" data-tip="${tip}"/>`;
+    s += `<path class="dna-link ${cls}${i === dna.step - 1 ? " now" : ""}" d="${path}" marker-end="url(#arr-${cls.split(" ")[0]})"/><path class="dna-hit" d="${path}" data-tip="${tip}"/>`;
     if (showAmt && on) {
       const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
       s += `<g pointer-events="none"><rect class="dna-amt-bg" x="${mx - 34}" y="${my - 9}" width="68" height="18" rx="5"/><text class="dna-amt" x="${mx}" y="${my + 4}" text-anchor="middle">${inrShort(l.amount)}</text></g>`;
@@ -1266,17 +1302,23 @@ document.addEventListener("click", async e => {
 });
 async function traceAccount(id) {
   goTab("a-analyst"); $$("#an-sub .btn")[0].click();
-  await loadAnalyst();
-  if (!mules.length) mules = (await det("mules").catch(() => ({ mules: [] }))).mules;
-  const m = mules.find(x => x.id === id);
-  if (m?.chain_id && dna.chains.some(c => c.chain_id === m.chain_id)) { await loadDNA(m.chain_id); }
+  dna.sel = id;
+  await loadDNA(id);
   if (dna.data?.nodes.some(n => n.account_id === id)) inspectNode(id);
   else toast(`${id} isn't part of a known mule chain`);
 }
+async function trackTransaction(txnId) {
+  goTab("a-analyst"); $$("#an-sub .btn")[0].click();
+  await loadDNA(txnId);
+  const t = dna.data?.target_txn_details;
+  if (t) { inspectNode(t.receiver); toast(`Tracking ${txnId}: ${t.sender} → ${t.receiver}, ${inrShort(t.amount)}`); }
+}
+document.addEventListener("click", e => { const b = e.target.closest("[data-track-txn]"); if (b) trackTransaction(b.dataset.trackTxn); });
 
 async function loadLedger() {
   $("#lg-list").innerHTML = `<tr><td colspan="8" class="empty">Loading…</td></tr>`;
-  ledger = (await det("transactions?limit=300").catch(() => ({ transactions: [] }))).transactions;
+  const q = ledgerFilter === "mule" ? "transactions?limit=500&mule_only=true" : "transactions?limit=300";
+  ledger = (await det(q).catch(() => ({ transactions: [] }))).transactions;
   renderLedger();
 }
 function renderLedger() {
@@ -1288,12 +1330,12 @@ function renderLedger() {
     <td>${esc(t.receiver_name || t.receiver)}<div class="mono muted xs">${esc(t.receiver)}</div></td>
     <td class="num">${inr(t.amount)}</td><td class="hide-sm small">${esc(t.channel)}</td>
     <td>${badge(t.status.includes("HELD") ? "s-ok" : t.is_mule_flow ? "s-bad" : "s-neutral", t.status)}</td>
-    <td><button class="btn sm" data-dna-acc="${esc(t.receiver)}">Inspect</button></td></tr>`).join("") || `<tr><td colspan="8" class="empty">No transactions match.</td></tr>`;
+    <td style="white-space:nowrap"><button class="btn sm" data-track-txn="${esc(t.id)}">Track money</button> ${t.chain_id ? `<button class="btn sm" data-dna-acc="${esc(t.receiver)}">Inspect</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="8" class="empty">No transactions match.</td></tr>`;
   $("#lg-count").textContent = `Showing ${Math.min(150, rows.length)} of ${rows.length} ledger entries.`;
 }
 $("#lg-search").addEventListener("input", renderLedger);
 $("#lg-refresh").onclick = loadLedger;
-filterGroup("#lg-filters", f => { ledgerFilter = f; renderLedger(); });
+filterGroup("#lg-filters", f => { const reload = (f === "mule") !== (ledgerFilter === "mule"); ledgerFilter = f; reload ? loadLedger() : renderLedger(); });
 
 async function loadMules() {
   mules = (await det("mules").catch(() => ({ mules: [] }))).mules;

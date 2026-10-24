@@ -3,7 +3,17 @@ services:
     name: bloodline-detector
     runtime: python
     plan: free
+    branch: main
+    autoDeploy: true
     rootDir: bloodline2_project
+    buildFilter:
+      paths:
+        - bloodline2_project/**
+      ignoredPaths:
+        - bloodline2_project/frontend/src/**
+        - bloodline2_project/notebooks/**
+        - bloodline2_project/docs/**
+        - bloodline2_project/**/*.md
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
@@ -15,7 +25,15 @@ services:
     name: bloodline-bank
     runtime: python
     plan: free
+    branch: main
+    autoDeploy: true
     rootDir: bloodline_bank
+    buildFilter:
+      paths:
+        - bloodline_bank/**
+        - bloodline2_project/data/bloodline.db
+      ignoredPaths:
+        - bloodline_bank/**/*.md
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     envVars:

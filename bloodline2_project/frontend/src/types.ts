@@ -104,10 +104,30 @@ export interface LineageLink {
   epoch_seconds: number;
   channel: string;
   is_held: boolean;
+  txn_id?: string;
+  is_target_txn?: boolean;
+}
+
+export interface AvailableChain {
+  chain_id: string;
+  txn_count: number;
+  total_volume: number;
+  label: string;
 }
 
 export interface LineageResponse {
   origin_ref: string;
+  active_chain?: string;
+  target_txn_id?: string;
+  target_txn_details?: {
+    id: string;
+    sender: string;
+    receiver: string;
+    amount: number;
+    channel: string;
+    ts: string;
+  };
+  available_chains?: AvailableChain[];
   nodes: LineageNode[];
   links: LineageLink[];
   timeline: Array<{

@@ -286,29 +286,167 @@ class CoreEngine:
     ) -> Dict[str, Any]:
         """
         Proportional haircut lineage tracer.
-        Node identity is (account, layer) to prevent cycles and ensure DAG visualization.
+        Node identity is canonical account_id with calibrated topological layers (0, 1, 2, 3)
+        to prevent duplicate nodes, eliminate cycles, and ensure clean DAG fund-flow visualization.
         """
         conn = self._get_conn()
         cursor = conn.cursor()
 
-        chain_id = None
-        if origin_ref and origin_ref.startswith("ORIGIN-MULE-CHAIN-"):
-            chain_id = "CH" + origin_ref.rsplit("-", 1)[-1].zfill(2)
-        elif origin_ref:
-            cursor.execute("SELECT chain_id FROM transactions WHERE chain_id = ? OR id = ? OR origin_txn_id = ? LIMIT 1",
-                           (origin_ref, origin_ref, origin_ref))
-            row = cursor.fetchone()
-            chain_id = row["chain_id"] if row else None
-        cursor.execute("SELECT * FROM transactions WHERE chain_id = ? ORDER BY epoch_seconds ASC",
-                       (chain_id or "CH01",))
+        # Query all available syndicate chains with metadata
+        cursor.execute("""
+            SELECT 
+                chain_id, 
+                COUNT(id) as txn_count,
+                SUM(amount) as total_volume
+            FROM transactions 
+            WHERE chain_id IS NOT NULL 
+            GROUP BY chain_id 
+            ORDER BY chain_id
+        """)
+        available_chains = [
+            {
+                "chain_id": row["chain_id"],
+                "txn_count": row["txn_count"],
+                "total_volume": round(row["total_volume"], 2),
+                "label": f"Syndicate {row['chain_id']} ({row['txn_count']} txns, ₹{round(row['total_volume']/100000, 1)}L)" if row['chain_id'] != 'VENDORATK' else f"BEC Vendor Attack ({row['txn_count']} txns, ₹{round(row['total_volume']/100000, 1)}L)"
+            }
+            for row in cursor.fetchall()
+        ]
 
-        txns = cursor.fetchall()
+        # Resolve target chain or individual transaction trace
+        target_chain = "CH03"
+        target_txn_id = None
+        target_txn_details = None
+        txns = []
+
+        if origin_ref and origin_ref not in ("ORIGIN-MULE-CHAIN-01", "default", ""):
+            # 1. Direct chain match
+            cursor.execute("SELECT 1 FROM transactions WHERE chain_id = ? LIMIT 1", (origin_ref,))
+            if cursor.fetchone():
+                target_chain = origin_ref
+            else:
+                # 2. Account match
+                cursor.execute("SELECT chain_id FROM accounts WHERE id = ?", (origin_ref,))
+                row = cursor.fetchone()
+                if row and row["chain_id"]:
+                    target_chain = row["chain_id"]
+                else:
+                    # 3. Direct Transaction match (supports tracking ANY transaction in the system)
+                    cursor.execute("SELECT * FROM transactions WHERE id = ?", (origin_ref,))
+                    txn_row = cursor.fetchone()
+                    if txn_row:
+                        target_txn_id = txn_row["id"]
+                        target_txn_details = {
+                            "id": txn_row["id"],
+                            "sender": txn_row["sender"],
+                            "receiver": txn_row["receiver"],
+                            "amount": txn_row["amount"],
+                            "channel": txn_row["channel"],
+                            "ts": txn_row["ts"]
+                        }
+                        if txn_row["chain_id"]:
+                            target_chain = txn_row["chain_id"]
+                        else:
+                            # Ad-hoc individual transaction trace across layers
+                            s = txn_row["sender"]
+                            r = txn_row["receiver"]
+                            cursor.execute("SELECT * FROM transactions WHERE receiver = ? ORDER BY epoch_seconds DESC LIMIT 4", (s,))
+                            upstreams = cursor.fetchall()
+                            cursor.execute("SELECT * FROM transactions WHERE sender = ? ORDER BY epoch_seconds ASC LIMIT 4", (r,))
+                            downstreams = cursor.fetchall()
+                            txns = list(upstreams) + [txn_row] + list(downstreams)
+                            target_chain = f"TXN:{target_txn_id}"
+
+        # Retrieve transactions for target chain if not an individual ad-hoc trace
         if not txns:
-            # Fallback to any mule flow
-            cursor.execute("SELECT * FROM transactions WHERE is_mule_flow = 1 ORDER BY epoch_seconds ASC LIMIT 100")
+            cursor.execute("""
+                SELECT * FROM transactions 
+                WHERE chain_id = ?
+                ORDER BY epoch_seconds ASC
+            """, (target_chain,))
             txns = cursor.fetchall()
 
+        if not txns:
+            cursor.execute("SELECT * FROM transactions WHERE chain_id = 'CH03' ORDER BY epoch_seconds ASC")
+            txns = cursor.fetchall()
+            target_chain = "CH03"
+
+        # Determine topological degrees
+        account_ids = set()
+        in_degree = {}
+        out_degree = {}
+        for t in txns:
+            s_id = t["sender"]
+            r_id = t["receiver"]
+            account_ids.add(s_id)
+            account_ids.add(r_id)
+            out_degree[s_id] = out_degree.get(s_id, 0) + 1
+            in_degree[r_id] = in_degree.get(r_id, 0) + 1
+
+        # Fetch all account profiles
+        cursor.execute(
+            f"SELECT id, layer, role, pseudonymous_label, bank_id, is_mule FROM accounts WHERE id IN ({','.join('?' for _ in account_ids)})",
+            list(account_ids)
+        )
+        acc_dict = {row["id"]: row for row in cursor.fetchall()}
+
+        # Compute canonical topological layer for each node (0, 1, 2, 3)
+        node_layers = {}
+        if target_chain.startswith("TXN:") and target_txn_details:
+            t_s = target_txn_details["sender"]
+            t_r = target_txn_details["receiver"]
+            for acc_id in account_ids:
+                if acc_id == t_s:
+                    node_layers[acc_id] = 1
+                elif acc_id == t_r:
+                    node_layers[acc_id] = 2
+                elif any(t["sender"] == acc_id and t["receiver"] == t_s for t in txns):
+                    node_layers[acc_id] = 0
+                elif any(t["sender"] == t_r and t["receiver"] == acc_id for t in txns):
+                    node_layers[acc_id] = 3
+                else:
+                    node_layers[acc_id] = 0 if in_degree.get(acc_id, 0) == 0 else 3
+        else:
+            for acc_id in account_ids:
+                acc_info = acc_dict.get(acc_id)
+                role = str(acc_info["role"] if acc_info else "").upper()
+                is_mule = acc_info["is_mule"] if acc_info else 0
+
+                if "NORMAL" in role or (is_mule == 0 and in_degree.get(acc_id, 0) == 0):
+                    node_layers[acc_id] = 0
+                elif "RECRUITER" in role:
+                    node_layers[acc_id] = 0
+                elif "L1" in role or "AGGREGATOR" in role:
+                    node_layers[acc_id] = 1
+                elif "L2" in role or "DISPERSAL" in role:
+                    node_layers[acc_id] = 2
+                elif "EXIT" in role or "CASHOUT" in role or out_degree.get(acc_id, 0) == 0:
+                    node_layers[acc_id] = 3
+                else:
+                    db_layer = acc_info["layer"] if acc_info else 1
+                    node_layers[acc_id] = min(3, max(0, db_layer))
+
+        # Build nodes map and calculate flows
         nodes_map = {}
+        for acc_id in account_ids:
+            acc_info = acc_dict.get(acc_id)
+            layer = node_layers.get(acc_id, 1)
+            is_held = acc_id in self.requested_holds
+            bank_id = acc_info["bank_id"] if acc_info else "INTERNAL"
+            nodes_map[acc_id] = {
+                "id": f"{acc_id}__L{layer}",
+                "account_id": acc_id,
+                "label": acc_info["pseudonymous_label"] if acc_info else acc_id,
+                "layer": layer,
+                "bank_id": bank_id,
+                "role": acc_info["role"] if acc_info else ("SOURCE" if layer == 0 else "MULE"),
+                "is_mule": acc_info["is_mule"] if acc_info else (0 if layer == 0 else 1),
+                "is_held": is_held,
+                "is_external": (bank_id not in ("INTERNAL", "BANK_ALPHA")),
+                "inflow": 0.0,
+                "outflow": 0.0
+            }
+
         links = []
         timeline = []
         total_tracked = 0.0
@@ -321,73 +459,36 @@ class CoreEngine:
             amt = t["amount"]
             sec = t["epoch_seconds"]
             ts = t["ts"]
-            origin = t["origin_txn_id"] or "ORIGIN-UNKNOWN"
 
-            # Determine layers
-            cursor.execute("SELECT layer, role, pseudonymous_label, bank_id, is_mule FROM accounts WHERE id = ?", (s_id,))
-            s_acc = cursor.fetchone()
-            cursor.execute("SELECT layer, role, pseudonymous_label, bank_id, is_mule FROM accounts WHERE id = ?", (r_id,))
-            r_acc = cursor.fetchone()
+            s_layer = node_layers.get(s_id, 0)
+            r_layer = node_layers.get(r_id, 1)
 
-            s_layer = (s_acc["layer"] if s_acc else None) or 0
-            r_layer = r_acc["layer"] if r_acc and r_acc["layer"] is not None else (s_layer + 1)
-            if r_layer <= s_layer:
-                r_layer = s_layer + 1 # Force strict DAG layer for Sankey
+            s_key = f"{s_id}__L{s_layer}"
+            r_key = f"{r_id}__L{r_layer}"
 
-            s_node_key = f"{s_id}__L{s_layer}"
-            r_node_key = f"{r_id}__L{r_layer}"
-
-            if s_node_key not in nodes_map:
-                nodes_map[s_node_key] = {
-                    "id": s_node_key,
-                    "account_id": s_id,
-                    "label": s_acc["pseudonymous_label"] if s_acc else s_id,
-                    "layer": s_layer,
-                    "bank_id": s_acc["bank_id"] if s_acc else "BANK_ALPHA",
-                    "role": s_acc["role"] if s_acc else "UNKNOWN",
-                    "is_mule": s_acc["is_mule"] if s_acc else 0,
-                    "is_held": s_id in self.requested_holds,
-                    "is_external": (s_acc["bank_id"] != "BANK_ALPHA") if s_acc else False,
-                    "inflow": 0.0,
-                    "outflow": 0.0
-                }
-
-            if r_node_key not in nodes_map:
-                is_held = r_id in self.requested_holds
-                nodes_map[r_node_key] = {
-                    "id": r_node_key,
-                    "account_id": r_id,
-                    "label": r_acc["pseudonymous_label"] if r_acc else r_id,
-                    "layer": r_layer,
-                    "bank_id": r_acc["bank_id"] if r_acc else "BANK_ALPHA",
-                    "role": r_acc["role"] if r_acc else "UNKNOWN",
-                    "is_mule": r_acc["is_mule"] if r_acc else 1,
-                    "is_held": is_held,
-                    "is_external": (r_acc["bank_id"] != "BANK_ALPHA") if r_acc else False,
-                    "inflow": 0.0,
-                    "outflow": 0.0
-                }
-
-            nodes_map[s_node_key]["outflow"] += amt
-            nodes_map[r_node_key]["inflow"] += amt
+            nodes_map[s_id]["outflow"] += amt
+            nodes_map[r_id]["inflow"] += amt
 
             # Check hold status on link
-            is_held_link = (r_id in self.requested_holds)
+            is_held_link = (r_id in self.requested_holds or s_id in self.requested_holds)
             if is_held_link:
                 total_frozen += amt
-            elif r_acc and r_acc["role"] in ("MULE_EXIT", "CASHOUT_EXTERNAL"):
+            elif r_layer == 3:
                 total_exited += amt
 
+            is_target_link = (t["id"] == target_txn_id) if target_txn_id else False
             links.append({
-                "source": s_node_key,
-                "target": r_node_key,
+                "source": s_key,
+                "target": r_key,
                 "source_account": s_id,
                 "target_account": r_id,
                 "amount": amt,
                 "timestamp": ts,
                 "epoch_seconds": sec,
                 "channel": t["channel"],
-                "is_held": is_held_link
+                "is_held": is_held_link,
+                "txn_id": t["id"],
+                "is_target_txn": is_target_link
             })
 
             timeline.append({
@@ -403,12 +504,27 @@ class CoreEngine:
 
         conn.close()
 
-        # Sort timeline
+        # Sort timeline by time
         timeline.sort(key=lambda x: x["epoch_seconds"])
 
+        # If tracing an individual transaction, prepend it to available_chains
+        if target_chain.startswith("TXN:") and target_txn_id:
+            available_chains = [
+                {
+                    "chain_id": target_chain,
+                    "txn_count": len(txns),
+                    "total_volume": round(total_tracked, 2),
+                    "label": f"★ Tracked Flow: {target_txn_id} (₹{round(total_tracked/1000, 1)}K)"
+                }
+            ] + available_chains
+
         return {
-            "origin_ref": origin_ref or "ORIGIN-MULE-CHAIN-01",
-            "chain_id": chain_id or "CH01",
+            "origin_ref": origin_ref or target_chain,
+            "active_chain": target_chain,
+            "chain_id": target_chain,
+            "target_txn_id": target_txn_id,
+            "target_txn_details": target_txn_details,
+            "available_chains": available_chains,
             "nodes": list(nodes_map.values()),
             "links": links,
             "timeline": timeline,

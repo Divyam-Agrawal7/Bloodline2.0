@@ -9,20 +9,22 @@ interface WarningModalProps {
   onProceedAnyway: () => void;
 }
 
+const TOTAL_COOLDOWN_SECONDS = 30;
+
 export const WarningModal: React.FC<WarningModalProps> = ({
   isOpen,
   scanData,
   onCancelPayment,
   onProceedAnyway
 }) => {
-  const [timeLeft, setTimeLeft] = useState(60);
+  const [timeLeft, setTimeLeft] = useState(TOTAL_COOLDOWN_SECONDS);
   const [confirmedRisk, setConfirmedRisk] = useState(false);
   const [showHelpline, setShowHelpline] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isOpen) {
-      setTimeLeft(60);
+      setTimeLeft(TOTAL_COOLDOWN_SECONDS);
       setConfirmedRisk(false);
       setShowHelpline(false);
       return;
@@ -34,7 +36,7 @@ export const WarningModal: React.FC<WarningModalProps> = ({
     // Prevent background scrolling
     document.body.style.overflow = 'hidden';
 
-    // 60-second timer countdown
+    // 30-second timer countdown
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -67,7 +69,7 @@ export const WarningModal: React.FC<WarningModalProps> = ({
   if (!isOpen || !scanData) return null;
 
   const isTimerDone = timeLeft === 0;
-  const progressPercent = ((60 - timeLeft) / 60) * 100;
+  const progressPercent = ((TOTAL_COOLDOWN_SECONDS - timeLeft) / TOTAL_COOLDOWN_SECONDS) * 100;
   const strokeDashoffset = 283 - (283 * progressPercent) / 100;
 
   return (
@@ -129,7 +131,7 @@ export const WarningModal: React.FC<WarningModalProps> = ({
                   stroke="currentColor"
                   strokeWidth="6"
                   strokeDasharray="251.2"
-                  strokeDashoffset={(251.2 * timeLeft) / 60}
+                  strokeDashoffset={(251.2 * timeLeft) / TOTAL_COOLDOWN_SECONDS}
                   strokeLinecap="round"
                   className="text-[#E5334F] transition-all duration-1000 ease-linear"
                   fill="transparent"

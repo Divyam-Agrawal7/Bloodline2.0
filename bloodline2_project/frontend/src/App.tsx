@@ -41,6 +41,21 @@ export default function App() {
     amount: 95000.0
   });
 
+  // Target state for Analyst Console & Money DNA
+  const [consoleTarget, setConsoleTarget] = useState<{
+    accountId?: string;
+    chainId?: string;
+    txnId?: string;
+  }>({
+    accountId: 'ACC02228',
+    chainId: 'CH03'
+  });
+
+  const handleNavigateToMoneyDNA = (accountId: string, chainId?: string) => {
+    setConsoleTarget({ accountId, chainId });
+    setActiveTab('console');
+  };
+
   const loadStats = async () => {
     try {
       const data = await fetchStats();
@@ -106,7 +121,7 @@ export default function App() {
         warningModal.scanData.account_id,
         'CANCELLED',
         undefined,
-        'Customer aborted transfer during 60s scam cooldown popup'
+        'Customer aborted transfer during 30s scam cooldown popup'
       );
       await loadStats();
       setNotification('Transaction CANCELLED by customer. ₹ prevented updated in top bar.');
@@ -270,13 +285,19 @@ export default function App() {
         {activeTab === 'scan' && (
           <ScanPage
             onTriggerWarning={handleTriggerWarning}
+            onNavigateToMoneyDNA={handleNavigateToMoneyDNA}
             initialAccount={scanPrefill.accountId}
             initialAmount={scanPrefill.amount}
           />
         )}
 
         {activeTab === 'console' && (
-          <AnalystConsolePage onRefreshStats={loadStats} />
+          <AnalystConsolePage
+            onRefreshStats={loadStats}
+            initialAccount={consoleTarget.accountId}
+            initialTxnId={consoleTarget.txnId}
+            initialChainId={consoleTarget.chainId}
+          />
         )}
 
         {activeTab === 'cases' && (

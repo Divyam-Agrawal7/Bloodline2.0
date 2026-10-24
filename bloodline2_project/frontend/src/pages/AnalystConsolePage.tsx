@@ -10,15 +10,26 @@ import { MoneyDNASankey } from '../components/MoneyDNASankey';
 
 interface AnalystConsolePageProps {
   onRefreshStats: () => void;
+  initialAccount?: string;
+  initialTxnId?: string;
+  initialChainId?: string;
 }
 
-export const AnalystConsolePage: React.FC<AnalystConsolePageProps> = ({ onRefreshStats }) => {
+export const AnalystConsolePage: React.FC<AnalystConsolePageProps> = ({
+  onRefreshStats,
+  initialAccount,
+  initialTxnId,
+  initialChainId
+}) => {
   // Navigation sub-tab
   const [activeTab, setActiveTab] = useState<'flow' | 'transactions' | 'mules'>('flow');
 
+  // Selected syndicate chain
+  const [selectedChainId, setSelectedChainId] = useState<string>(initialChainId || 'CH03');
+
   // Lineage data
   const [lineageData, setLineageData] = useState<LineageResponse | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>('ACC02228');
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(initialAccount || 'ACC02228');
   const [timelineIndex, setTimelineIndex] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [handoffSuccess, setHandoffSuccess] = useState<any | null>(null);
@@ -37,15 +48,23 @@ export const AnalystConsolePage: React.FC<AnalystConsolePageProps> = ({ onRefres
   const [isLoadingMules, setIsLoadingMules] = useState<boolean>(false);
 
   // Load Lineage Data
-  const loadLineage = async () => {
+  const loadLineage = async (chainId?: string) => {
+    const chain = chainId || selectedChainId || 'CH03';
     try {
-      const data = await fetchLineage('ORIGIN-MULE-CHAIN-01');
+      const data = await fetchLineage(chain);
       setLineageData(data);
+      if (data.active_chain) {
+        setSelectedChainId(data.active_chain);
+      }
       if (data.timeline && data.timeline.length > 0) {
         setTimelineIndex(data.timeline.length - 1);
       }
-      if (data.nodes && data.nodes.length > 0 && !selectedNodeId) {
-        setSelectedNodeId(data.nodes[0].account_id);
+      if (data.nodes && data.nodes.length > 0) {
+        const exists = data.nodes.some((n) => n.account_id === selectedNodeId);
+        if (!exists) {
+          const preferred = data.nodes.find((n) => n.layer === 1) || data.nodes[0];
+          setSelectedNodeId(preferred.account_id);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -79,10 +98,13 @@ export const AnalystConsolePage: React.FC<AnalystConsolePageProps> = ({ onRefres
   };
 
   useEffect(() => {
-    loadLineage();
+    const startRef = initialTxnId || initialChainId || initialAccount || 'CH03';
+    if (initialAccount) setSelectedNodeId(initialAccount);
+    if (initialChainId) setSelectedChainId(initialChainId);
+    loadLineage(startRef);
     loadTransactions();
     loadMules();
-  }, []);
+  }, [initialTxnId, initialChainId, initialAccount]);
 
   // Time replay animation loop
   useEffect(() => {
@@ -105,13 +127,39 @@ export const AnalystConsolePage: React.FC<AnalystConsolePageProps> = ({ onRefres
     setIsHolding(true);
     try {
       await requestLienHold(accId);
-      await Promise.all([loadLineage(), loadMules(), loadTransactions()]);
+      await Promise.all([loadLineage(selectedChainId), loadMules(), loadTransactions()]);
       onRefreshStats();
     } catch (e) {
       console.error(e);
     } finally {
       setIsHolding(false);
     }
+  };
+
+  const handleTrackMoney = async (t: LiveTransactionItem) => {
+    await loadLineage(t.id);
+    setSelectedNodeId(t.receiver);
+    setActiveTab('flow');
+  };
+
+  const handleInspectTransaction = async (t: LiveTransactionItem) => {
+    const targetChain = t.chain_id || 'CH03';
+    if (targetChain !== selectedChainId) {
+      setSelectedChainId(targetChain);
+      await loadLineage(targetChain);
+    }
+    setSelectedNodeId(t.receiver);
+    setActiveTab('flow');
+  };
+
+  const handleInspectMule = async (m: MuleAccountItem) => {
+    const targetChain = m.chain_id || 'CH03';
+    if (targetChain !== selectedChainId) {
+      setSelectedChainId(targetChain);
+      await loadLineage(targetChain);
+    }
+    setSelectedNodeId(m.id);
+    setActiveTab('flow');
   };
 
   const handleCrossBankHandoff = async () => {
@@ -264,6 +312,11 @@ export const AnalystConsolePage: React.FC<AnalystConsolePageProps> = ({ onRefres
             onSelectNode={(id) => setSelectedNodeId(id)}
             onRequestHold={handleRequestHold}
             selectedAccountId={selectedNodeId}
+            selectedChainId={selectedChainId}
+            onSelectChain={(chain) => {
+              setSelectedChainId(chain);
+              loadLineage(chain);
+            }}
           />
 
           {/* Time Scrubber Replay Bar */}
@@ -574,15 +627,22 @@ export const AnalystConsolePage: React.FC<AnalystConsolePageProps> = ({ onRefres
                             </span>
                           </td>
                           <td className="py-2.5 px-4 text-center">
-                            <button
-                              onClick={() => {
-                                setSelectedNodeId(t.receiver);
-                                setActiveTab('flow');
-                              }}
-                              className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-white text-[10px] font-sans font-semibold transition"
-                            >
-                              Inspect
-                            </button>
+                            <div className="flex items-center justify-center space-x-1.5">
+                              <button
+                                onClick={() => handleTrackMoney(t)}
+                                className="px-2 py-1 rounded bg-[#E5334F] hover:bg-rose-600 text-white font-bold text-[10px] shadow flex items-center space-x-1 transition"
+                                title="Trace Money DNA fund-flow DAG for this transaction"
+                              >
+                                <GitBranch className="w-3 h-3" />
+                                <span>Track Money</span>
+                              </button>
+                              <button
+                                onClick={() => handleInspectTransaction(t)}
+                                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-white text-[10px] font-sans font-semibold transition"
+                              >
+                                Inspect
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -714,10 +774,7 @@ export const AnalystConsolePage: React.FC<AnalystConsolePageProps> = ({ onRefres
 
                 <div className="flex items-center space-x-2 pt-1">
                   <button
-                    onClick={() => {
-                      setSelectedNodeId(m.id);
-                      setActiveTab('flow');
-                    }}
+                    onClick={() => handleInspectMule(m)}
                     className="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 transition text-center"
                   >
                     View in Money DNA

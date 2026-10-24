@@ -40,6 +40,8 @@ cd ..\bloodline_bank
 
 If Render gives the detector a different hostname than `bloodline-detector.onrender.com`, set the bank's `DETECTOR_URL` to the real one.
 
+**Auto-deploy:** every push to `main` redeploys automatically, but only the service whose files changed. A change under `bloodline_bank/` redeploys the bank (about 1 minute). A change under `bloodline2_project/` redeploys the detector (about 5 minutes, because of the ML packages). Changes that only touch docs, notebooks or the React source don't trigger a deploy. Follow progress under each service's **Events** tab.
+
 Free services sleep after about 15 minutes idle. The first request after that takes up to a minute while they wake, and the first scans may show "couldn't check" until the detector is up. A restart resets the bank's accounts and activity.
 
 ## Logins
