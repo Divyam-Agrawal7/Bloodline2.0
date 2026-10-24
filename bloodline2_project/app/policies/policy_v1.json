@@ -1,0 +1,66 @@
+{
+  "policy_version": "synthetic-demo-v1",
+  "effective_date": "2026-01-01T00:00:00Z",
+  "review_date": "2026-12-31T23:59:59Z",
+  "regulatory_frameworks": [
+    {
+      "name": "FATF Guidance on Digital IDs & Mule Account Interception",
+      "source_url": "https://www.fatf-gafi.org/publications/mule-networks",
+      "status": "ADVISORY_PROTOTYPE"
+    },
+    {
+      "name": "FCA / PSR Authorised Push Payment (APP) Fraud Guidelines",
+      "source_url": "https://www.psr.org.uk/app-fraud-reimbursement",
+      "cooling_off_standard": "2_HOURS_MINIMUM"
+    }
+  ],
+  "decision_thresholds": {
+    "allow_max": 0.39,
+    "review_min": 0.40,
+    "delay_review_min": 0.70,
+    "hold_freeze_min": 0.88,
+    "bounded_limits": {
+      "min_allowable": 0.50,
+      "max_allowable": 0.95
+    }
+  },
+  "cooling_off_rules": {
+    "NEW_PAYEE_HIGH_VELOCITY": {
+      "default_duration_hours": 2,
+      "allow_override_with_approval": true,
+      "customer_message": "Payment paused for 2-hour fraud security check. You may cancel anytime."
+    },
+    "RAPID_PASS_THROUGH": {
+      "default_duration_hours": 24,
+      "allow_override_with_approval": false,
+      "customer_message": "Recipient account has shown rapid pass-through activity. Held pending specialist verification."
+    },
+    "VENDOR_BANK_CHANGE": {
+      "default_duration_hours": 48,
+      "allow_override_with_approval": true,
+      "customer_message": "Vendor bank details changed within the last 72 hours. Dual-authorization callback required."
+    }
+  },
+  "case_clock": {
+    "states": [
+      "suspected",
+      "show_cause_pending",
+      "representation_window",
+      "order_pending",
+      "classified",
+      "reported_closed",
+      "false_positive_closed"
+    ],
+    "deadlines_hours": {
+      "show_cause_pending": 24,
+      "representation_window": 48,
+      "order_pending": 168,
+      "classified": 24
+    },
+    "roles": {
+      "analyst": ["open_case", "flag_suspected", "submit_evidence", "close_false_positive"],
+      "senior_investigator": ["issue_show_cause", "review_representation", "request_freeze_order"],
+      "compliance_officer": ["approve_classification", "file_sar_report", "override_threshold"]
+    }
+  }
+}

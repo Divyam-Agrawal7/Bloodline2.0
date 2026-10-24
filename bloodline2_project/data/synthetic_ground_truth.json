@@ -1,0 +1,125 @@
+{
+  "metadata": {
+    "generated_at": "2026-10-23T11:39:16.265198+00:00",
+    "version": "synthetic-v2.0",
+    "description": "Disclosed synthetic benchmark dataset for mule network and Money DNA evaluation"
+  },
+  "accounts": [
+    {
+      "account_id": "ACC-LEGIT-CORP",
+      "pseudonymous_label": "Meridian Enterprise Logistics",
+      "account_type": "COMMERCIAL",
+      "balance": 845000.0,
+      "mule_score": 0.04,
+      "is_mule_ground_truth": false
+    },
+    {
+      "account_id": "ACC-LEGIT-RETAIL",
+      "pseudonymous_label": "Sarah Jenkins (Retail Payroll)",
+      "account_type": "RETAIL_CHECKING",
+      "balance": 4350.0,
+      "mule_score": 0.08,
+      "is_mule_ground_truth": false
+    },
+    {
+      "account_id": "ACC-VICTIM-01",
+      "pseudonymous_label": "Estate Trust Client Alpha",
+      "account_type": "PRIVATE_WEALTH",
+      "balance": 210000.0,
+      "mule_score": 0.12,
+      "is_mule_ground_truth": false
+    },
+    {
+      "account_id": "ACC-MULE-HUB1",
+      "pseudonymous_label": "Pioneer Digital Trading (Hub 1)",
+      "account_type": "NEW_BUSINESS",
+      "balance": 1200.0,
+      "mule_score": 0.93,
+      "is_mule_ground_truth": true,
+      "mule_role": "AGGREGATOR_FAN_OUT"
+    },
+    {
+      "account_id": "ACC-MULE-002",
+      "pseudonymous_label": "FastTrack Courier Hub",
+      "account_type": "CHECKING",
+      "balance": 350.0,
+      "mule_score": 0.89,
+      "is_mule_ground_truth": true,
+      "mule_role": "LAYERING_PASS_THROUGH"
+    },
+    {
+      "account_id": "ACC-MULE-003",
+      "pseudonymous_label": "Apex Apex Freelance",
+      "account_type": "CHECKING",
+      "balance": 410.0,
+      "mule_score": 0.86,
+      "is_mule_ground_truth": true,
+      "mule_role": "LAYERING_PASS_THROUGH"
+    },
+    {
+      "account_id": "ACC-MULE-004",
+      "pseudonymous_label": "Metro Quick Services",
+      "account_type": "CHECKING",
+      "balance": 620.0,
+      "mule_score": 0.91,
+      "is_mule_ground_truth": true,
+      "mule_role": "LAYERING_PASS_THROUGH"
+    },
+    {
+      "account_id": "ACC-EXIT-CRYPTO",
+      "pseudonymous_label": "Overseas Virtual Asset Gateway",
+      "account_type": "EXCHANGE_GATEWAY",
+      "balance": 189000.0,
+      "mule_score": 0.95,
+      "is_mule_ground_truth": true,
+      "mule_role": "CASH_OUT_EXIT"
+    },
+    {
+      "account_id": "ACC-EXIT-RUNNER",
+      "pseudonymous_label": "K. V. Runner Services",
+      "account_type": "RETAIL_CHECKING",
+      "balance": 150.0,
+      "mule_score": 0.92,
+      "is_mule_ground_truth": true,
+      "mule_role": "ATM_RUNNER"
+    }
+  ],
+  "transactions": [
+    {
+      "transaction_id": "TXN-ORIGIN-75K",
+      "sender_account_id": "ACC-VICTIM-01",
+      "receiver_account_id": "ACC-MULE-HUB1",
+      "amount": 75000.0,
+      "channel": "WIRE",
+      "timestamp": "2026-10-20T13:39:16.265094+00:00",
+      "is_fraud_ground_truth": true
+    },
+    {
+      "transaction_id": "TXN-SPLIT-01",
+      "sender_account_id": "ACC-MULE-HUB1",
+      "receiver_account_id": "ACC-MULE-002",
+      "amount": 25000.0,
+      "channel": "FAST_PAY",
+      "timestamp": "2026-10-20T13:57:16.265094+00:00",
+      "is_fraud_ground_truth": true
+    },
+    {
+      "transaction_id": "TXN-SPLIT-02",
+      "sender_account_id": "ACC-MULE-HUB1",
+      "receiver_account_id": "ACC-MULE-003",
+      "amount": 24500.0,
+      "channel": "FAST_PAY",
+      "timestamp": "2026-10-20T14:03:16.265094+00:00",
+      "is_fraud_ground_truth": true
+    },
+    {
+      "transaction_id": "TXN-SPLIT-03",
+      "sender_account_id": "ACC-MULE-HUB1",
+      "receiver_account_id": "ACC-MULE-004",
+      "amount": 24300.0,
+      "channel": "FAST_PAY",
+      "timestamp": "2026-10-20T14:11:16.265094+00:00",
+      "is_fraud_ground_truth": true
+    }
+  ]
+}

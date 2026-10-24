@@ -1,0 +1,84 @@
+# Bloodline 2.0 Regulatory & Operating Configuration
+# Note: Demonstration only, not legal advice.
+
+system:
+  name: "Bloodline 2.0"
+  environment: "synthetic-demo"
+  seed: 42
+  disclaimer: "Demonstration only, not legal advice. All data and transaction graphs are synthetic."
+
+regulatory_framework:
+  jurisdiction: "IN"
+  regulator: "Reserve Bank of India (RBI)"
+  sources:
+    - title: "RBI Master Directions – Priority Sector Lending & Fraud Risk Management in Commercial Banks"
+      link: "https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx?id=10497"
+      ref: "RBI/DBS.CO/CFMC.BC.No.1/23.04.001/2016-17"
+    - title: "Customer Protection – Limiting Liability of Customers in Unauthorised Electronic Banking Transactions"
+      link: "https://www.rbi.org.in/Scripts/NotificationUser.aspx?Id=11040"
+      ref: "DBR.No.Leg.BC.78/09.07.005/2017-18"
+    - title: "SOP on Mule Account Identification & Operation Lien"
+      link: "https://cybercrime.gov.in/Webform/Helpline.aspx"
+      ref: "I4C-MHA-MULE-CIRCULAR-2024"
+
+case_clock:
+  stages:
+    - id: "SUSPECTED"
+      name: "Suspected Mule Account"
+      description: "Triggered by ML score >= threshold or anomalous velocity spike"
+      requires_human_approval: false
+      next_stages: ["SHOW_CAUSE_ISSUED", "CLOSED_DISMISSED"]
+    - id: "SHOW_CAUSE_ISSUED"
+      name: "Show-cause Notice Issued"
+      description: "Statutory 21-day window for account holder explanation"
+      duration_days: 21
+      requires_human_approval: true
+      approval_label: "Approve Show-Cause Notice Draft"
+      next_stages: ["REPRESENTATION_RECEIVED", "REASONED_ORDER"]
+    - id: "REPRESENTATION_RECEIVED"
+      name: "Representation Received"
+      description: "Customer representation submitted; compliance officer review pending"
+      requires_human_approval: false
+      next_stages: ["REASONED_ORDER", "CLOSED_EXONERATED"]
+    - id: "REASONED_ORDER"
+      name: "Reasoned Order Passed"
+      description: "Formal assessment order citing transaction ledger and device graph evidence"
+      requires_human_approval: true
+      approval_label: "Confirm Reasoned Order Findings"
+      next_stages: ["CLASSIFIED", "CLOSED_EXONERATED"]
+    - id: "CLASSIFIED"
+      name: "Classified as Fraud / Mule"
+      description: "Internal fraud classification triggers 14-day mandatory FMR filing clock"
+      duration_days: 14
+      requires_human_approval: true
+      approval_label: "Confirm Legal Fraud Classification"
+      next_stages: ["FMR_FILED"]
+    - id: "FMR_FILED"
+      name: "Fraud Monitoring Return (FMR) Filed"
+      description: "FMR-1 report transmitted to Central Fraud Registry (RBI CFR)"
+      requires_human_approval: false
+      next_stages: ["CLOSED_LIEN_CONFIRMED"]
+    - id: "CLOSED"
+      name: "Case Closed"
+      description: "Final disposition completed"
+      requires_human_approval: false
+      next_stages: []
+
+scoring:
+  default_threshold_hold: 0.70
+  default_threshold_delay: 0.40
+  watch_window_hours: 24
+  feedback_tuning:
+    step_size: 0.02
+    min_threshold: 0.50
+    max_threshold: 0.88
+    recall_floor: 0.85
+  honeypot_boost_factor: 0.35
+
+compensation:
+  # RBI circular DBR.No.Leg.BC.78/09.07.005/2017-18
+  # For third-party breach where customer reports within 4-7 working days:
+  # liability limited or bank compensates according to transaction tier.
+  loss_threshold_inr: 50000.0
+  compensation_ratio: 0.85
+  compensation_cap_inr: 25000.0

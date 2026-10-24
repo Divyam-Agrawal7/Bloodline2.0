@@ -1,0 +1,1502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bloodline Bank</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #0B0F19; --header: #111625; --surface: #161C2E; --surface-2: #1C2338; --input: #151B2B;
+  --border: rgba(255, 255, 255, 0.05); --border-input: rgba(255, 255, 255, 0.08); --border-strong: rgba(255, 255, 255, 0.14);
+  --text: #FFFFFF; --muted: #8E9BB0;
+  --brand: #FF3B30; --brand-2: #FF5E62; --brand-ink: #FFFFFF;
+  --hero: linear-gradient(135deg, #FF5E62 0%, #FF3B30 50%, #D83232 100%);
+  --low: #00D68F; --low-bg: rgba(0, 214, 143, 0.14); --med: #F59E0B; --med-bg: rgba(245, 158, 11, 0.14);
+  --high: #F43F5E; --high-bg: rgba(244, 63, 94, 0.14); --blocked: #C9D1DE; --blocked-bg: rgba(255, 255, 255, 0.08);
+  --info: #A970FF; --info-bg: rgba(121, 40, 202, 0.22);
+  --series-1: #7928CA; --series-2: #F43F5E; --flow: #F43F5E; --held: #00D68F; --exit: #A970FF;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+body.locked { overflow: hidden; }
+button, input, select { font: inherit; color: inherit; }
+h1, h2, h3 { margin: 0 0 .6rem; line-height: 1.2; }
+h2 { font-size: 1.15rem; }
+h3 { font-size: 1rem; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+.small { font-size: .85rem; }
+.xs { font-size: .78rem; }
+.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: .88em; }
+.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.row { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+.spacer { flex: 1; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.1rem 1.2rem; box-shadow: var(--shadow); min-width: 0; }
+.stack > * + * { margin-top: 1rem; }
+.grid { display: grid; gap: 1rem; }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.g-5-7 { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start; }
+@media (max-width: 900px) { .g-5-7 { grid-template-columns: 1fr; } }
+.btn { border: 1px solid var(--border-input); background: var(--surface-2); padding: .5rem .9rem; border-radius: 8px; cursor: pointer; white-space: nowrap; text-decoration: none; display: inline-block; }
+.btn:hover:not(:disabled) { background: var(--surface-2); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.btn.primary:hover:not(:disabled) { background: var(--brand-2); }
+.btn.danger { color: var(--high); border-color: var(--high); }
+.btn.sm { padding: .25rem .55rem; font-size: .82rem; border-radius: 6px; }
+.btn.block { width: 100%; text-align: center; }
+label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
+input[type=text], input[type=password], input[type=number], input[type=search], select { width: 100%; padding: .55rem .7rem; border: 1px solid var(--border-input); border-radius: 10px; background: var(--input); }
+input:focus, select:focus, .btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+input[type=range] { width: 100%; accent-color: var(--brand); }
+input[type=checkbox] { accent-color: var(--brand); width: 1rem; height: 1rem; }
+.field + .field { margin-top: .85rem; }
+.error { color: var(--high); font-size: .88rem; min-height: 1.2em; margin-top: .5rem; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: .5rem .55rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+th { font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 600; }
+tbody tr:hover { background: var(--surface-2); }
+tr.sel { background: var(--info-bg) !important; }
+tr.click { cursor: pointer; }
+.table-wrap { overflow-x: auto; }
+.scroll { max-height: 560px; overflow: auto; }
+.badge { display: inline-block; padding: .1rem .5rem; border-radius: 999px; font-size: .76rem; font-weight: 600; white-space: nowrap; }
+.cap { text-transform: capitalize; }
+.r-low, .s-completed, .s-ok { color: var(--low); background: var(--low-bg); }
+.r-medium, .s-flagged, .s-warn { color: var(--med); background: var(--med-bg); }
+.r-high, .s-pending, .s-bad { color: var(--high); background: var(--high-bg); }
+.r-blocked, .s-blocked { color: var(--blocked); background: var(--blocked-bg); }
+.r-unknown, .s-ignored, .s-neutral { color: var(--muted); background: var(--surface-2); }
+.s-cancelled, .s-info { color: var(--info); background: var(--info-bg); }
+.note { border-radius: 8px; padding: .7rem .85rem; font-size: .9rem; background: var(--surface-2); }
+.note.info { background: var(--info-bg); }
+.note.bad { background: var(--high-bg); color: var(--high); }
+.note.ok { background: var(--low-bg); color: var(--low); }
+
+.topbar { background: var(--header); color: var(--text); border-bottom: 1px solid var(--border); }
+.topbar .inner { max-width: 1320px; margin: 0 auto; padding: .8rem 16px; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.logo { display: flex; align-items: center; gap: .55rem; font-weight: 700; font-size: 1.1rem; letter-spacing: .01em; }
+.logo svg { width: 26px; height: 26px; color: var(--brand); }
+.topbar .who { font-size: .9rem; opacity: .92; }
+.topbar .btn { background: transparent; color: var(--text); border-color: var(--border-strong); }
+.topbar .btn:hover { background: var(--surface-2); }
+.tabs { background: var(--header); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 20; }
+.tabs .inner { max-width: 1320px; margin: 0 auto; padding: 0 16px; display: flex; gap: .15rem; overflow-x: auto; }
+.tab { border: 0; background: none; padding: .8rem .8rem; cursor: pointer; color: var(--muted); border-bottom: 3px solid transparent; white-space: nowrap; }
+.tab.active { color: var(--text); border-bottom-color: var(--brand); font-weight: 600; }
+.tab .count { margin-left: .35rem; background: var(--high); color: #fff; border-radius: 999px; padding: 0 .4rem; font-size: .72rem; }
+.subtabs { display: flex; gap: .4rem; flex-wrap: wrap; }
+.subtabs .btn.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+main { max-width: 1320px; margin: 0 auto; padding: 1.2rem 16px 3rem; }
+.page-head { margin-bottom: 1rem; }
+.page-head p { margin: .2rem 0 0; color: var(--muted); font-size: .9rem; }
+
+#login-view { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--bg); }
+.login-box { width: 100%; max-width: 420px; }
+.login-box .logo { color: var(--text); justify-content: center; font-size: 1.5rem; margin-bottom: 1.2rem; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--input); border-radius: 9px; padding: 3px; margin-bottom: 1rem; }
+.seg button { border: 0; background: none; padding: .5rem; border-radius: 7px; cursor: pointer; color: var(--muted); }
+.seg button.active { background: var(--brand); color: #fff; color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
+.demo { margin-top: 1rem; font-size: .85rem; color: var(--muted); }
+.demo button { border: 0; background: none; color: var(--brand); cursor: pointer; padding: 0; text-decoration: underline; font-size: .85rem; }
+
+.balance-card { background: var(--hero); color: #fff; border: 0; }
+.balance-card .amt { font-size: 2rem; font-weight: 700; margin: .2rem 0; font-variant-numeric: tabular-nums; }
+.balance-card .muted { color: rgba(255,255,255,.78); }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .8rem; }
+.tile { background: var(--hero); color: #fff; border: 0; border-radius: 14px; padding: .8rem 1rem; min-width: 0; }
+.tile .v { font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tile .k { font-size: .8rem; color: rgba(255,255,255,.85); }
+.tile .d { font-size: .76rem; color: rgba(255,255,255,.75); margin-top: .15rem; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: .35rem; background: var(--muted); }
+.dot.ok { background: var(--low); } .dot.bad { background: var(--high); }
+.feed td { font-size: .87rem; }
+.flash { animation: flash 1.2s ease-out; }
+@keyframes flash { from { background: var(--info-bg); } to { background: transparent; } }
+
+.overlay { position: fixed; inset: 0; background: rgba(5,8,14,.8); display: grid; place-items: center; padding: 16px; z-index: 50; }
+.modal { width: 100%; max-width: 560px; max-height: calc(100vh - 32px); overflow: auto; }
+.modal.wide { max-width: 680px; }
+.intercept { border: 2px solid var(--high); }
+.intercept.medium { border-color: var(--med); }
+.intercept-head { display: flex; gap: .9rem; align-items: flex-start; margin-bottom: 1rem; }
+.intercept-icon { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; background: var(--high-bg); color: var(--high); flex: none; }
+.intercept.medium .intercept-icon { background: var(--med-bg); color: var(--med); }
+.intercept-icon svg { width: 26px; height: 26px; }
+.intercept-body { display: grid; grid-template-columns: 120px 1fr; gap: 1rem; align-items: center; background: var(--surface-2); border-radius: 10px; padding: .9rem; }
+@media (max-width: 520px) { .intercept-body { grid-template-columns: 1fr; justify-items: center; } }
+.ring { position: relative; width: 96px; height: 96px; }
+.ring svg { transform: rotate(-90deg); }
+.ring .t { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; line-height: 1; }
+.ring .t b { font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+.ring .t span { display: block; font-size: .62rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: .2rem; }
+.eyebrow { font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: .35rem; }
+.reasons { margin: 0; padding-left: 1.1rem; font-size: .92rem; }
+.reasons li + li { margin-top: .25rem; }
+.ack { display: flex; gap: .6rem; align-items: flex-start; margin-top: .9rem; font-size: .88rem; }
+.ack input { margin-top: .15rem; flex: none; }
+.ack.off { color: var(--muted); }
+.helpline { margin-top: .9rem; }
+
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); background: var(--surface); border-left: 1px solid var(--border); box-shadow: var(--shadow); z-index: 40; overflow: auto; padding: 1.1rem 1.2rem 2rem; }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: .3rem 1rem; font-size: .9rem; margin: 0; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+.bar { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--brand); border-radius: 4px; }
+.shap + .shap { margin-top: .6rem; }
+.shap .row { gap: .5rem; flex-wrap: nowrap; font-size: .86rem; margin-bottom: .2rem; }
+.shap .row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hops { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .6rem; }
+.hop { border: 1px solid var(--border); border-radius: 8px; padding: .55rem .7rem; font-size: .84rem; min-width: 0; }
+.hop .row { flex-wrap: nowrap; }
+.chips { display: flex; gap: .4rem; flex-wrap: wrap; }
+.scenarios { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.scenario { text-align: left; border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: .5rem .6rem; cursor: pointer; font-size: .82rem; min-width: 0; }
+.scenario:hover, .scenario.on { border-color: var(--brand); }
+.scenario b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gauge-wrap { display: flex; gap: 1.2rem; align-items: center; flex-wrap: wrap; }
+.gauge text { font-variant-numeric: tabular-nums; }
+.slider-row { display: grid; grid-template-columns: 1fr 70px; gap: .7rem; align-items: center; }
+.slider-row output { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); padding: .6rem 1rem; border-radius: 8px; z-index: 60; font-size: .9rem; max-width: calc(100% - 32px); }
+.filters { display: flex; gap: .4rem; flex-wrap: wrap; }
+.filters .btn.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.empty { padding: 1.5rem; text-align: center; color: var(--muted); }
+
+.dna-canvas { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); }
+.dna-canvas svg { display: block; }
+.dna-node { cursor: pointer; }
+.dna-node rect { fill: var(--surface-2); stroke: var(--border-strong); stroke-width: 1.5; }
+.dna-node.l0 rect { stroke: var(--low); }
+.dna-node.l1 rect, .dna-node.l2 rect { stroke: var(--flow); }
+.dna-node.l3 rect { stroke: var(--exit); }
+.dna-node.held rect { fill: var(--low-bg); stroke: var(--held); stroke-width: 2.5; }
+.dna-node.sel rect { stroke: var(--info); stroke-width: 3; }
+.dna-node.dim { opacity: .38; }
+.dna-node text { fill: var(--text); font-size: 11px; }
+.dna-node text.sub { fill: var(--muted); font-size: 10px; }
+.dna-link { fill: none; stroke-width: 2; }
+.dna-link.on { stroke: var(--flow); }
+.dna-link.held { stroke: var(--held); }
+.dna-link.off { stroke: var(--border-strong); stroke-dasharray: 4 4; }
+.dna-link.now { stroke-width: 4; }
+.dna-hit { fill: none; stroke: transparent; stroke-width: 12; cursor: help; }
+.dna-col { fill: var(--surface); opacity: .8; }
+.dna-head { fill: var(--text); font-size: 12px; font-weight: 700; }
+.dna-headsub { fill: var(--muted); font-size: 10px; }
+.dna-amt { fill: var(--text); font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.dna-amt-bg { fill: var(--surface); stroke: var(--border); }
+.legend { display: flex; gap: 1rem; flex-wrap: wrap; font-size: .82rem; color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: .35rem; border-radius: 2px; }
+.legend i.box { width: 12px; height: 12px; border-radius: 3px; }
+
+.case-card { border: 1px solid var(--border); border-radius: 10px; padding: .7rem .8rem; cursor: pointer; }
+.case-card + .case-card { margin-top: .6rem; }
+.case-card:hover { border-color: var(--muted); }
+.case-card.on { border-color: var(--brand); background: var(--high-bg); }
+.doc { white-space: pre-line; font-size: .86rem; background: var(--surface-2); border-radius: 8px; padding: .8rem .9rem; max-height: 260px; overflow: auto; }
+.doc.mono { font-size: .8rem; }
+.clock { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cm { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; text-align: center; }
+.cm div { background: var(--surface-2); border-radius: 8px; padding: .6rem; }
+.cm b { display: block; font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.cm span { font-size: .76rem; color: var(--muted); }
+.chart svg { display: block; width: 100%; height: auto; }
+.chart .gridline { stroke: var(--border); stroke-width: 1; }
+.chart .axis { fill: var(--muted); font-size: 11px; }
+.chart .val { fill: var(--text); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart .bar1 { fill: var(--series-1); }
+.chart .bar2 { fill: var(--series-2); }
+.chart rect.hit { fill: transparent; cursor: default; }
+.chart rect.hit:hover { fill: var(--text); fill-opacity: .05; }
+.tip { position: fixed; z-index: 70; pointer-events: none; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow); border-radius: 8px; padding: .45rem .6rem; font-size: .8rem; max-width: 280px; }
+@media (max-width: 640px) {
+  .hide-sm { display: none; }
+  .balance-card .amt { font-size: 1.6rem; }
+  .scenarios { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="logo" viewBox="0 0 32 32"><path fill="currentColor" d="M16 2 4 7v8c0 7.2 5.1 13.4 12 15 6.9-1.6 12-7.8 12-15V7L16 2Zm0 6c2.8 3.6 5 6.6 5 9.2A5 5 0 0 1 16 22a5 5 0 0 1-5-4.8C11 14.6 13.2 11.6 16 8Z"/></symbol>
+  <symbol id="octagon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 7v6M12 16.5v.5"/></symbol>
+  <marker id="arr-on" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 1 9 5 0 9z" style="fill:var(--flow)"/></marker>
+  <marker id="arr-held" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 1 9 5 0 9z" style="fill:var(--held)"/></marker>
+  <marker id="arr-off" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 1 9 5 0 9z" style="fill:var(--border-strong)"/></marker>
+</svg>
+
+<section id="login-view">
+  <div class="login-box">
+    <div class="logo"><svg><use href="#logo"/></svg> Bloodline Bank</div>
+    <div class="card">
+      <div class="seg" role="tablist">
+        <button class="active" data-role="user">Customer</button>
+        <button data-role="admin">Admin</button>
+      </div>
+      <form id="login-form">
+        <div class="field"><label for="lg-user" id="lg-user-label">Customer ID</label><input id="lg-user" type="text" autocomplete="username" required></div>
+        <div class="field"><label for="lg-pass">Password</label><input id="lg-pass" type="password" autocomplete="current-password" required></div>
+        <div class="error" id="lg-err"></div>
+        <button class="btn primary block" style="margin-top:.4rem">Log in</button>
+      </form>
+      <div class="demo" id="demo-logins"></div>
+    </div>
+  </div>
+</section>
+
+<section id="user-view" class="hidden">
+  <header class="topbar"><div class="inner">
+    <div class="logo"><svg><use href="#logo"/></svg> Bloodline Bank</div>
+    <span class="who" id="u-who"></span><span class="spacer"></span>
+    <button class="btn sm" data-logout>Log out</button>
+  </div></header>
+  <nav class="tabs"><div class="inner" id="u-tabs">
+    <button class="tab active" data-tab="u-overview">Overview</button>
+    <button class="tab" data-tab="u-transfer">Fund transfer</button>
+    <button class="tab" data-tab="u-payees">Payees</button>
+    <button class="tab" data-tab="u-statement">Statement</button>
+  </div></nav>
+  <main>
+    <div id="u-overview" class="pane stack">
+      <div id="u-blocked" class="card hidden" style="border-color:var(--high)"><strong>Your account is blocked.</strong> Outgoing payments are disabled. Please contact the bank.</div>
+      <div class="grid g2">
+        <div class="card balance-card">
+          <div class="muted small">Savings account · <span id="u-accno" class="mono"></span></div>
+          <div class="amt" id="u-balance">–</div>
+          <div class="muted small">Available balance</div>
+          <div class="row" style="margin-top:1rem"><button class="btn" style="background:#fff;color:#D83232;border:0" data-goto="u-transfer">Send money</button></div>
+        </div>
+        <div class="card">
+          <h3>Safe-payment protection</h3>
+          <p class="muted small" style="margin:0">Every payment is checked by Bloodline before money leaves your account. If the person you're paying looks like a money-mule account, we pause the payment so you have time to think. Fraudsters rush you; we don't.</p>
+        </div>
+      </div>
+      <div class="card"><div class="row"><h2>Recent activity</h2><span class="spacer"></span><button class="btn sm" data-goto="u-statement">Full statement</button></div>
+        <div class="table-wrap"><table><tbody id="u-recent"></tbody></table></div></div>
+    </div>
+
+    <div id="u-transfer" class="pane hidden">
+      <div class="grid g2">
+        <form class="card" id="tx-form">
+          <h2>Fund transfer</h2>
+          <div class="field"><label for="tx-payee">Pay to</label><select id="tx-payee"></select></div>
+          <div class="field" id="tx-new-wrap"><label for="tx-new">Account number</label>
+            <input id="tx-new" type="text" placeholder="e.g. ACC00329" autocomplete="off">
+            <div class="small muted" id="tx-new-name" style="margin-top:.3rem"></div></div>
+          <div class="field"><label for="tx-amount">Amount (₹)</label><input id="tx-amount" type="number" min="1" step="0.01" required></div>
+          <div class="field"><label for="tx-remarks">Remarks</label><input id="tx-remarks" type="text" maxlength="60" placeholder="Optional"></div>
+          <div class="error" id="tx-err"></div>
+          <button class="btn primary" id="tx-go">Continue</button>
+        </form>
+        <div class="card">
+          <h3>Before you pay</h3>
+          <ul class="muted small" style="padding-left:1.1rem;margin:0">
+            <li>Nobody genuine will ask you to pay a "registration fee" for a job or a prize.</li>
+            <li>Bank staff and police will never ask you to move money to a "safe account".</li>
+            <li>If you see a warning, take the pause. Call the person on a number you already have.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div id="u-payees" class="pane hidden">
+      <div class="grid g2">
+        <div class="card"><h2>Your payees</h2><div class="table-wrap"><table><tbody id="u-payee-list"></tbody></table></div></div>
+        <form class="card" id="payee-form"><h2>Add payee</h2>
+          <div class="field"><label for="py-id">Account number</label><input id="py-id" type="text" required autocomplete="off"></div>
+          <div class="error" id="py-err"></div>
+          <button class="btn primary">Add payee</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="u-statement" class="pane hidden">
+      <div class="card"><h2>Account statement</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Details</th><th class="hide-sm">Reference</th><th class="num">Debit</th><th class="num">Credit</th><th>Status</th></tr></thead>
+          <tbody id="u-stmt"></tbody></table></div></div>
+    </div>
+  </main>
+</section>
+
+<section id="admin-view" class="hidden">
+  <header class="topbar"><div class="inner">
+    <div class="logo"><svg><use href="#logo"/></svg> Bloodline Bank · Admin</div>
+    <span class="who" id="a-detector"></span><span class="spacer"></span>
+    <button class="btn sm" data-logout>Log out</button>
+  </div></header>
+  <nav class="tabs"><div class="inner" id="a-tabs">
+    <button class="tab active" data-tab="a-monitor">Live monitor</button>
+    <button class="tab" data-tab="a-sim">Simulation</button>
+    <button class="tab" data-tab="a-review">Suspicious accounts<span class="count hidden" id="a-pending"></span></button>
+    <button class="tab" data-tab="a-scan">Pre-payment scan</button>
+    <button class="tab" data-tab="a-analyst">Analyst console</button>
+    <button class="tab" data-tab="a-cases">Case queue</button>
+    <button class="tab" data-tab="a-shield">Business Shield</button>
+    <button class="tab" data-tab="a-impact">Impact &amp; ML eval</button>
+    <button class="tab" data-tab="a-settings">Settings</button>
+  </div></nav>
+  <main>
+    <div id="a-monitor" class="pane stack">
+      <div class="tiles" id="a-tiles"></div>
+      <div class="card"><div class="row"><h2>Live transactions</h2><span class="spacer"></span><span class="small muted" id="a-feed-note"></span></div>
+        <div class="table-wrap"><table class="feed">
+          <thead><tr><th>Time</th><th>From</th><th>To</th><th class="num">Amount</th><th>Risk</th><th class="num">Score</th><th>Outcome</th><th class="hide-sm">Source</th></tr></thead>
+          <tbody id="a-feed"></tbody></table></div></div>
+    </div>
+
+    <div id="a-sim" class="pane hidden stack">
+      <div class="tiles" id="a-tiles-2"></div>
+      <div class="grid g2">
+        <div class="card stack">
+          <div class="row"><h2 style="margin:0">Real-time traffic</h2><span class="spacer"></span><span class="badge" id="sim-status"></span></div>
+          <p class="muted small" style="margin:0">Simulated customers pay each other continuously. Each tick fires several payments at the same time, and each one is scanned by Bloodline before it moves. Every so often a mule ring starts: several victims pay one mule account at once, then the mule sweeps the money on.</p>
+          <div><label>Ticks per second</label><div class="slider-row"><input type="range" id="sim-rate" min="0.2" max="5" step="0.2"><output id="sim-rate-o"></output></div></div>
+          <div><label>Payments per tick (parallel)</label><div class="slider-row"><input type="range" id="sim-conc" min="1" max="20" step="1"><output id="sim-conc-o"></output></div></div>
+          <div><label>Warned payers who cancel</label><div class="slider-row"><input type="range" id="sim-heed" min="0" max="1" step="0.05"><output id="sim-heed-o"></output></div></div>
+          <div><label>Start a mule ring every N ticks</label><div class="slider-row"><input type="range" id="sim-ring" min="3" max="60" step="1"><output id="sim-ring-o"></output></div></div>
+          <div class="row"><button class="btn primary" id="sim-toggle">Start</button></div>
+        </div>
+        <div class="card stack">
+          <h2>One-off tests</h2>
+          <div><h3>Mule ring</h3><p class="muted small" style="margin:.2rem 0 .6rem">5–9 customers pay one known mule account at the same moment, then the mule pays out to 2–4 exit accounts.</p>
+            <button class="btn" id="sim-ring-btn">Launch mule ring</button></div>
+          <div><h3>Burst</h3><p class="muted small" style="margin:.2rem 0 .6rem">Fire many payments at once to test the detector under load.</p>
+            <div class="row"><input type="number" id="burst-n" value="25" min="1" max="100" style="width:100px"><button class="btn" id="burst-btn">Fire burst</button><span class="small muted" id="burst-out"></span></div></div>
+          <div><h3>Reset</h3><p class="muted small" style="margin:.2rem 0 .6rem">Stop traffic and clear all transactions, payees and account reviews. Balances are kept.</p>
+            <button class="btn danger" id="reset-btn">Clear bank activity</button></div>
+        </div>
+      </div>
+      <div class="card"><h2>Live transactions</h2>
+        <div class="table-wrap"><table class="feed">
+          <thead><tr><th>Time</th><th>From</th><th>To</th><th class="num">Amount</th><th>Risk</th><th class="num">Score</th><th>Outcome</th><th class="hide-sm">Source</th></tr></thead>
+          <tbody id="a-feed-2"></tbody></table></div></div>
+    </div>
+
+    <div id="a-review" class="pane hidden stack">
+      <div class="card">
+        <div class="row" style="margin-bottom:.8rem"><h2 style="margin:0">Suspicious accounts</h2><span class="spacer"></span>
+          <div class="filters" id="rv-filters">
+            <button class="btn sm on" data-f="pending">Needs review</button>
+            <button class="btn sm" data-f="flagged">Flagged</button>
+            <button class="btn sm" data-f="blocked">Blocked</button>
+            <button class="btn sm" data-f="ignored">Ignored</button>
+            <button class="btn sm" data-f="all">All</button>
+          </div></div>
+        <p class="muted small" style="margin:0 0 .8rem">Accounts that received a medium or high risk payment. <strong>Flag</strong> keeps watching it and forces at least a medium warning for payers. <strong>Block</strong> stops all payments to and from it and places a lien hold in the detector. <strong>Ignore</strong> marks it as genuine: payers won't be warned and the detector is told it was a false positive.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Account</th><th>Risk</th><th class="num">Score</th><th class="num">Payers</th><th class="num hide-sm">Attempted</th><th class="num hide-sm">Received</th><th class="hide-sm">Last seen</th><th>Status</th><th>Decision</th></tr></thead>
+          <tbody id="rv-list"></tbody></table></div>
+      </div>
+    </div>
+
+    <div id="a-scan" class="pane hidden">
+      <div class="page-head"><h2>Customer pre-payment scan</h2><p>Run the same real-time check a customer's payment goes through, and see the full explanation behind it. No money moves.</p></div>
+      <div class="grid g-5-7">
+        <form class="card" id="scan-form">
+          <h3>Make a test transfer</h3>
+          <div class="eyebrow" style="margin-top:.6rem">Test scenarios</div>
+          <div class="scenarios" id="scan-scenarios"></div>
+          <div class="field" style="margin-top:1rem"><label for="sc-payee">Beneficiary account</label><input id="sc-payee" type="text" class="mono" required></div>
+          <div class="field"><label for="sc-amount">Amount (₹)</label><input id="sc-amount" type="number" min="1" step="0.01" required></div>
+          <div class="field"><label for="sc-sender">Sender account (optional)</label><input id="sc-sender" type="text" class="mono" placeholder="e.g. ACC00001"></div>
+          <div class="field"><label for="sc-remark">Remark</label><input id="sc-remark" type="text" value="Contractor urgent advance"></div>
+          <div class="error" id="sc-err"></div>
+          <button class="btn primary block" id="sc-go">Scan pre-payment risk</button>
+        </form>
+        <div id="scan-result"><div class="card empty">Pick a scenario or enter an account to scan.</div></div>
+      </div>
+    </div>
+
+    <div id="a-analyst" class="pane hidden stack">
+      <div class="row"><div class="page-head" style="margin:0"><h2>Analyst investigation console</h2><p>Replay how stolen money moved through a mule chain, inspect the ledger, and place lien holds.</p></div><span class="spacer"></span>
+        <div class="subtabs" id="an-sub">
+          <button class="btn sm on" data-sub="an-dna">Money DNA flow</button>
+          <button class="btn sm" data-sub="an-ledger">Ledger feed</button>
+          <button class="btn sm" data-sub="an-mules">Detected mules</button>
+        </div></div>
+      <div id="an-handoff" class="note info hidden"></div>
+
+      <div id="an-dna" class="stack">
+        <div class="card stack">
+          <div class="row">
+            <div style="min-width:220px"><label for="dna-chain">Mule chain</label><select id="dna-chain"></select></div>
+            <span class="spacer"></span>
+            <div class="legend">
+              <span><i style="background:var(--flow)"></i>Money moved</span>
+              <span><i style="background:var(--held)"></i>Into a held account</span>
+              <span><i style="background:var(--border)"></i>Not yet replayed</span>
+              <span><i class="box" style="border:2px solid var(--exit)"></i>Cash-out exit</span>
+            </div>
+          </div>
+          <div class="dna-canvas" id="dna-canvas"><div class="empty">Loading Money DNA…</div></div>
+          <div class="row">
+            <button class="btn primary sm" id="dna-play" aria-label="Play replay">Play</button>
+            <button class="btn sm" id="dna-rewind">Rewind</button>
+            <div class="small"><strong id="dna-step"></strong> <span class="muted mono" id="dna-now"></span></div>
+            <span class="spacer"></span>
+            <span class="badge s-info" id="dna-taint"></span>
+          </div>
+          <input type="range" id="dna-slider" min="0" max="0" value="0" aria-label="Replay position">
+          <div class="tiles" id="dna-tiles"></div>
+        </div>
+        <div class="grid g2">
+          <div class="card" id="dna-inspect"><div class="empty">Click an account in the graph to inspect it.</div></div>
+          <div class="card" id="dna-hops"><h3>Predicted next hops</h3><div class="empty">Select an account.</div></div>
+        </div>
+      </div>
+
+      <div id="an-ledger" class="hidden">
+        <div class="card">
+          <div class="row" style="margin-bottom:.8rem">
+            <input type="search" id="lg-search" placeholder="Search by transaction, sender or receiver" style="flex:1;min-width:200px">
+            <div class="filters" id="lg-filters">
+              <button class="btn sm on" data-f="all">All</button>
+              <button class="btn sm" data-f="mule">Mule flows</button>
+              <button class="btn sm" data-f="held">Held (lien)</button>
+            </div>
+            <button class="btn sm" id="lg-refresh">Refresh</button>
+          </div>
+          <div class="table-wrap scroll"><table>
+            <thead><tr><th>Time</th><th>Reference</th><th>Sender</th><th>Receiver</th><th class="num">Amount</th><th class="hide-sm">Channel</th><th>Status</th><th></th></tr></thead>
+            <tbody id="lg-list"></tbody></table></div>
+          <div class="small muted" id="lg-count" style="margin-top:.5rem"></div>
+        </div>
+      </div>
+
+      <div id="an-mules" class="hidden">
+        <div class="card">
+          <div class="row" style="margin-bottom:.8rem">
+            <input type="search" id="mu-search" placeholder="Search by account, name or chain (e.g. CH03)" style="flex:1;min-width:200px">
+            <div class="filters" id="mu-filters">
+              <button class="btn sm on" data-f="all">All</button>
+              <button class="btn sm" data-f="L1">L1 aggregators</button>
+              <button class="btn sm" data-f="L2">L2 dispersal</button>
+              <button class="btn sm" data-f="held">Lien requested</button>
+            </div>
+          </div>
+          <div class="table-wrap scroll"><table>
+            <thead><tr><th>Account</th><th>Role</th><th>Chain</th><th class="num">Layer</th><th class="num hide-sm">Shared devices</th><th class="num hide-sm">Balance</th><th class="hide-sm">KYC</th><th>Status</th><th></th></tr></thead>
+            <tbody id="mu-list"></tbody></table></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="a-cases" class="pane hidden">
+      <div class="row page-head"><div><h2>Regulatory case clock queue</h2><p>Formal mule-account cases with the 21-day show-cause and 14-day FMR deadlines. Legal steps need human sign-off.</p></div><span class="spacer"></span>
+        <div class="row small"><span class="muted">Simulate time:</span><button class="btn sm" data-days="1">+1 day</button><button class="btn sm" data-days="5">+5 days</button><button class="btn sm primary" data-days="14">+14 days</button></div></div>
+      <div id="cs-msg" class="note info hidden" style="margin-bottom:1rem"></div>
+      <div class="grid g-5-7">
+        <div class="card"><div class="row"><h3 style="margin:0">Investigation dossiers</h3><span class="spacer"></span><span class="small muted" id="cs-count"></span></div>
+          <div class="scroll" style="margin-top:.8rem" id="cs-list"></div></div>
+        <div class="card" id="cs-detail"><div class="empty">Select a case.</div></div>
+      </div>
+    </div>
+
+    <div id="a-shield" class="pane hidden">
+      <div class="page-head"><h2>Business Shield: invoice defence</h2><p>Catches business email compromise: invoices whose payout account has been switched away from the vendor's verified account.</p></div>
+      <div id="sh-msg" class="note info hidden" style="margin-bottom:1rem"></div>
+      <div class="grid g-5-7" style="grid-template-columns:minmax(0,7fr) minmax(0,5fr)">
+        <div class="card">
+          <div class="row" style="margin-bottom:.8rem"><h3 style="margin:0">Procurement invoices</h3><span class="spacer"></span>
+            <div class="filters" id="sh-filters">
+              <button class="btn sm on" data-f="alert">Tampered</button>
+              <button class="btn sm" data-f="all">All</button>
+            </div></div>
+          <div class="table-wrap scroll"><table>
+            <thead><tr><th>Invoice</th><th>Vendor</th><th class="num">Amount</th><th class="hide-sm">Due</th><th>Status</th><th>Alert</th></tr></thead>
+            <tbody id="sh-list"></tbody></table></div>
+        </div>
+        <div class="card" id="sh-detail"><div class="empty">Select an invoice.</div></div>
+      </div>
+    </div>
+
+    <div id="a-impact" class="pane hidden stack">
+      <div class="page-head" style="margin:0"><h2>Impact &amp; model evaluation</h2><p>Detector impact counters, this bank's live results, and the model's held-out test metrics read from <span class="mono">eval/metrics.json</span>.</p></div>
+      <div><div class="eyebrow">Detector impact</div><div class="tiles" id="im-detector"></div></div>
+      <div><div class="eyebrow">This bank, live</div><div class="tiles" id="im-bank"></div></div>
+      <div class="grid g2">
+        <div class="card">
+          <div class="row"><h3 style="margin:0">ML model vs rule-only baseline</h3><span class="spacer"></span>
+            <div class="legend"><span><i class="box" style="background:var(--series-1)"></i>ML model</span><span><i class="box" style="background:var(--series-2)"></i>Rule baseline</span></div></div>
+          <p class="small muted" style="margin:.3rem 0 .6rem" id="im-sub"></p>
+          <div class="chart" id="im-chart"></div>
+        </div>
+        <div class="card">
+          <h3>Test-set details</h3>
+          <div class="table-wrap"><table id="im-table"></table></div>
+          <div class="note small" id="im-robust" style="margin-top:.8rem"></div>
+        </div>
+      </div>
+      <div class="grid g2">
+        <div class="card"><h3>ML model confusion matrix</h3><div class="cm" id="im-cm-ml"></div></div>
+        <div class="card"><h3>Rule baseline confusion matrix</h3><div class="cm" id="im-cm-rule"></div></div>
+      </div>
+    </div>
+
+    <div id="a-settings" class="pane hidden">
+      <form class="card" id="set-form" style="max-width:620px">
+        <h2>Payer protection</h2>
+        <p class="muted small">How long a warned customer must wait before they can send anyway. The server enforces it, so it can't be skipped from the browser. 0 turns the pause off.</p>
+        <div class="grid g2" style="gap:.9rem">
+          <div><label for="set-ms">Medium risk pause (seconds)</label><input type="number" id="set-ms" min="0" max="600"></div>
+          <div><label for="set-hs">High risk pause (seconds)</label><input type="number" id="set-hs" min="0" max="600"></div>
+        </div>
+        <h2 style="margin-top:1.4rem">Risk bands</h2>
+        <p class="muted small">The detector's probability that the payee is a mule. At or above the medium threshold is medium risk; at or above the high threshold is high risk.</p>
+        <div class="grid g2" style="gap:.9rem">
+          <div><label for="set-mt">Medium threshold</label><input type="number" id="set-mt" min="0.01" max="0.99" step="0.01"></div>
+          <div><label for="set-ht">High threshold</label><input type="number" id="set-ht" min="0.01" max="0.99" step="0.01"></div>
+        </div>
+        <div class="error" id="set-err"></div>
+        <button class="btn primary">Save settings</button>
+      </form>
+    </div>
+  </main>
+</section>
+
+<div id="warn" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="warn-title">
+  <div class="card modal wide intercept" id="warn-card" tabindex="-1">
+    <div class="intercept-head">
+      <div class="intercept-icon"><svg><use href="#octagon"/></svg></div>
+      <div>
+        <div class="row" style="gap:.5rem"><span class="badge" id="warn-badge"></span><span class="small muted mono" id="warn-score"></span></div>
+        <h2 id="warn-title" style="margin:.35rem 0 .2rem"></h2>
+        <div class="small muted" id="warn-sub"></div>
+      </div>
+    </div>
+    <div class="intercept-body" id="warn-body">
+      <div class="ring" id="warn-ring"><svg width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="40" fill="none" style="stroke:var(--border-strong)" stroke-width="7"/><circle id="warn-arc" cx="48" cy="48" r="40" fill="none" stroke-width="7" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="0"/></svg><div class="t"><div><b id="warn-t"></b><span>seconds</span></div></div></div>
+      <div><div class="eyebrow">Why this payment was paused</div><ul class="reasons" id="warn-reasons"></ul></div>
+    </div>
+    <div class="note info small" id="warn-cf" style="margin-top:.9rem"></div>
+    <label class="ack off" id="warn-ack-wrap"><input type="checkbox" id="warn-ack" disabled> <span>I understand this account shows signs of being used by fraudsters, and that money I send to it may not be recoverable.</span></label>
+    <div class="note helpline hidden" id="warn-help">
+      <strong>National Cyber Fraud Helpline &amp; Bank Security Desk</strong>
+      <p class="small" style="margin:.3rem 0">If someone claiming to be from the police, CBI, tax department or customs told you to send this money, hang up now.</p>
+      <div class="chips"><span class="badge s-neutral">Cyber helpline: 1930</span><span class="badge s-neutral">Bank fraud desk: 1800-425-0018</span></div>
+    </div>
+    <div class="error" id="warn-err"></div>
+    <div class="row" style="margin-top:.6rem">
+      <button class="btn primary" id="warn-cancel">Cancel payment (protect my money)</button>
+      <span class="spacer"></span>
+      <button class="btn sm" id="warn-call">Call bank helpline</button>
+      <button class="btn sm" id="warn-send"></button>
+    </div>
+  </div>
+</div>
+
+<div id="confirm" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="cf-title">
+  <div class="card modal">
+    <h2 id="cf-title">Confirm payment</h2>
+    <dl class="kv" id="cf-kv"></dl>
+    <div class="small muted" id="cf-note" style="margin-top:.8rem"></div>
+    <div class="error" id="cf-err"></div>
+    <div class="row" style="margin-top:1rem;justify-content:flex-end">
+      <button class="btn" id="cf-cancel">Cancel</button>
+      <button class="btn primary" id="cf-send">Pay now</button>
+    </div>
+  </div>
+</div>
+
+<div id="done" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="dn-title">
+  <div class="card modal" style="text-align:center">
+    <h2 id="dn-title"></h2><p class="muted" id="dn-body"></p>
+    <button class="btn primary" id="dn-ok">Done</button>
+  </div>
+</div>
+
+<div id="signoff" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="so-title">
+  <div class="card modal">
+    <h2 id="so-title">Human sign-off required</h2>
+    <p class="small">The system never classifies anyone as a fraudster or issues a legal notice on its own. You are confirming your compliance authorisation to move case <strong class="mono" id="so-case"></strong> to <strong id="so-stage"></strong>.</p>
+    <div class="error" id="so-err"></div>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn" id="so-cancel">Cancel</button>
+      <button class="btn primary" id="so-ok">Confirm authorisation</button>
+    </div>
+  </div>
+</div>
+
+<aside class="drawer hidden" id="drawer" aria-label="Account investigation">
+  <div class="row"><h2 style="margin:0" id="dr-title"></h2><span class="spacer"></span><button class="btn sm" id="dr-close">Close</button></div>
+  <div id="dr-body" class="stack" style="margin-top:1rem"></div>
+</aside>
+
+<div class="toast hidden" id="toast"></div>
+<div class="tip hidden" id="tip"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const inr = n => n == null ? "" : "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const inrShort = v => {
+  if (v == null) return "₹0";
+  const a = Math.abs(v);
+  if (a >= 1e7) return "₹" + (v / 1e7).toFixed(2) + " Cr";
+  if (a >= 1e5) return "₹" + (v / 1e5).toFixed(2) + " L";
+  return "₹" + Math.round(v).toLocaleString("en-IN");
+};
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const when = ts => new Date(ts * 1000).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const clock = ts => new Date(ts * 1000).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const isoShort = s => String(s || "").replace("T", " ").slice(0, 16);
+const badge = (cls, text) => `<span class="badge ${cls}">${esc(text)}</span>`;
+const riskBadge = r => r ? badge("cap r-" + r, r) : "";
+const score = s => s == null ? "–" : (s * 100).toFixed(0) + "%";
+const pct = (s, d = 1) => s == null ? "–" : (s * 100).toFixed(d) + "%";
+
+let auth = null;
+try { auth = JSON.parse(sessionStorage.getItem("bb-auth")); } catch {}
+let loginRole = "user";
+let timers = [];
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    method: opts.method || (opts.body ? "POST" : "GET"),
+    headers: { "Content-Type": "application/json", ...(auth ? { Authorization: "Bearer " + auth.token } : {}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && auth) { logout(); }
+  if (!res.ok) { const e = new Error(typeof data.detail === "string" ? data.detail : "Something went wrong"); e.status = res.status; throw e; }
+  return data;
+}
+const det = (path, body) => api("/api/admin/detector/" + path, body ? { body } : {});
+const reviewAction = (id, action, note) => api(`/api/admin/accounts/${encodeURIComponent(id)}/action`, { body: { action, note } });
+
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.add("hidden"), 2800);
+}
+function note(sel, msg, kind = "info") {
+  const n = $(sel); n.className = "note " + kind; n.textContent = msg; n.classList.remove("hidden");
+  clearTimeout(n._h); n._h = setTimeout(() => n.classList.add("hidden"), 8000);
+}
+
+document.addEventListener("mousemove", e => {
+  const t = e.target.closest?.("[data-tip]"), tip = $("#tip");
+  if (!t) { tip.classList.add("hidden"); return; }
+  tip.innerHTML = t.getAttribute("data-tip"); tip.classList.remove("hidden");
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.min(innerWidth - w - 8, e.clientX + 14) + "px";
+  tip.style.top = (e.clientY + h + 24 > innerHeight ? e.clientY - h - 12 : e.clientY + 16) + "px";
+});
+
+function every(ms, fn) { fn(); timers.push(setInterval(fn, ms)); }
+function stopTimers() { timers.forEach(clearInterval); timers = []; }
+function show(view) { ["login-view", "user-view", "admin-view"].forEach(v => $("#" + v).classList.toggle("hidden", v !== view)); }
+
+function setupTabs(container, onChange) {
+  $(container).addEventListener("click", e => {
+    const b = e.target.closest(".tab"); if (!b) return;
+    selectTab(container, b.dataset.tab); onChange && onChange(b.dataset.tab);
+  });
+}
+function selectTab(container, id) {
+  $$(container + " .tab").forEach(t => t.classList.toggle("active", t.dataset.tab === id));
+  const pane = $("#" + id); pane.parentElement.querySelectorAll(":scope > .pane").forEach(p => p.classList.toggle("hidden", p !== pane));
+}
+function filterGroup(sel, onChange) {
+  $(sel).addEventListener("click", e => {
+    const b = e.target.closest("[data-f]"); if (!b) return;
+    $$(sel + " .btn").forEach(x => x.classList.toggle("on", x === b)); onChange(b.dataset.f);
+  });
+}
+
+$$(".seg button").forEach(b => b.addEventListener("click", () => {
+  loginRole = b.dataset.role;
+  $$(".seg button").forEach(x => x.classList.toggle("active", x === b));
+  $("#lg-user-label").textContent = loginRole === "admin" ? "Admin username" : "Customer ID";
+  $("#lg-err").textContent = ""; renderDemo();
+}));
+
+let demo = null;
+async function renderDemo() {
+  if (!demo) { try { demo = await api("/api/demo-logins"); } catch { return; } }
+  const el = $("#demo-logins");
+  if (loginRole === "admin") {
+    el.innerHTML = `Demo admin: <button data-u="${esc(demo.admin.username)}" data-p="${esc(demo.admin.password)}">${esc(demo.admin.username)} / ${esc(demo.admin.password)}</button>`;
+  } else {
+    el.innerHTML = `Demo customers (password <span class="mono">${esc(demo.user_password)}</span>): ` +
+      demo.customers.map(c => `<button data-u="${esc(c.id)}" data-p="${esc(demo.user_password)}">${esc(c.id)}</button>`).join(", ");
+  }
+  el.querySelectorAll("button").forEach(b => b.onclick = () => { $("#lg-user").value = b.dataset.u; $("#lg-pass").value = b.dataset.p; });
+}
+
+$("#login-form").addEventListener("submit", async e => {
+  e.preventDefault(); $("#lg-err").textContent = "";
+  try {
+    auth = await api("/api/login", { body: { role: loginRole, username: $("#lg-user").value, password: $("#lg-pass").value } });
+    try { sessionStorage.setItem("bb-auth", JSON.stringify(auth)); } catch {}
+    $("#lg-pass").value = ""; start();
+  } catch (err) { $("#lg-err").textContent = err.message; }
+});
+
+function logout() {
+  if (auth) fetch("/api/logout", { method: "POST", headers: { Authorization: "Bearer " + auth.token } }).catch(() => {});
+  auth = null; try { sessionStorage.removeItem("bb-auth"); } catch {}
+  stopTimers(); dnaStop(); $("#drawer").classList.add("hidden");
+  ["#warn", "#confirm", "#done", "#signoff"].forEach(s => $(s).classList.add("hidden"));
+  document.body.classList.remove("locked");
+  show("login-view"); renderDemo();
+}
+$$("[data-logout]").forEach(b => b.addEventListener("click", logout));
+
+function start() {
+  stopTimers();
+  if (!auth) { show("login-view"); renderDemo(); return; }
+  if (auth.role === "admin") startAdmin(); else startUser();
+}
+
+let me = null, payees = [];
+function startUser() { show("user-view"); selectTab("#u-tabs", "u-overview"); every(4000, refreshUser); }
+setupTabs("#u-tabs", id => { if (id === "u-payees" || id === "u-transfer") loadPayees(); if (id === "u-statement") loadStatement(); });
+$$("[data-goto]").forEach(b => b.addEventListener("click", () => { selectTab("#u-tabs", b.dataset.goto); if (b.dataset.goto === "u-transfer") loadPayees(); if (b.dataset.goto === "u-statement") loadStatement(); }));
+
+async function refreshUser() {
+  try { me = await api("/api/user/summary"); } catch { return; }
+  $("#u-who").textContent = me.name;
+  $("#u-accno").textContent = me.id;
+  $("#u-balance").textContent = inr(me.balance);
+  $("#u-blocked").classList.toggle("hidden", me.status !== "blocked");
+  const rows = await api("/api/user/statement").catch(() => []);
+  $("#u-recent").innerHTML = rows.slice(0, 6).map(r => `<tr><td>${esc(r.counterparty_name)}<div class="small muted">${when(r.ts)}</div></td>
+    <td class="num" style="color:${r.debit ? "var(--text)" : "var(--low)"}">${r.debit ? "−" + inr(r.debit) : "+" + inr(r.credit)}</td>
+    <td>${r.status !== "completed" ? badge("cap s-" + r.status, r.status) : ""}</td></tr>`).join("") || `<tr><td class="empty">No transactions yet.</td></tr>`;
+  if (!$("#u-statement").classList.contains("hidden")) renderStatement(rows);
+}
+
+async function loadStatement() { renderStatement(await api("/api/user/statement").catch(() => [])); }
+function renderStatement(rows) {
+  $("#u-stmt").innerHTML = rows.map(r => `<tr><td class="small">${when(r.ts)}</td>
+    <td>${esc(r.counterparty_name)} <span class="mono muted">${esc(r.counterparty)}</span>${r.remarks ? `<div class="small muted">${esc(r.remarks)}</div>` : ""}</td>
+    <td class="mono hide-sm">${esc(r.ref)}</td><td class="num">${inr(r.debit)}</td><td class="num">${inr(r.credit)}</td>
+    <td>${badge("cap s-" + r.status, r.status)}</td></tr>`).join("") || `<tr><td colspan="6" class="empty">No transactions yet.</td></tr>`;
+}
+
+async function loadPayees() {
+  payees = await api("/api/user/payees").catch(() => []);
+  $("#u-payee-list").innerHTML = payees.map(p => `<tr><td>${esc(p.name)}<div class="mono muted">${esc(p.id)}</div></td>
+    <td class="num"><button class="btn sm" data-pay="${esc(p.id)}">Pay</button> <button class="btn sm danger" data-del="${esc(p.id)}">Remove</button></td></tr>`).join("")
+    || `<tr><td class="empty">No payees yet. Add one, or pay any account number from Fund transfer.</td></tr>`;
+  const sel = $("#tx-payee"), keep = sel.value;
+  sel.innerHTML = payees.map(p => `<option value="${esc(p.id)}">${esc(p.name)} · ${esc(p.id)}</option>`).join("") + `<option value="">New account number…</option>`;
+  if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+  $("#tx-new-wrap").classList.toggle("hidden", sel.value !== "");
+}
+$("#u-payee-list").addEventListener("click", async e => {
+  const pay = e.target.dataset.pay, del = e.target.dataset.del;
+  if (pay) { selectTab("#u-tabs", "u-transfer"); await loadPayees(); $("#tx-payee").value = pay; $("#tx-new-wrap").classList.add("hidden"); $("#tx-amount").focus(); }
+  if (del) { await api("/api/user/payees/" + encodeURIComponent(del), { method: "DELETE" }); loadPayees(); }
+});
+$("#payee-form").addEventListener("submit", async e => {
+  e.preventDefault(); $("#py-err").textContent = "";
+  try { const p = await api("/api/user/payees", { body: { payee_id: $("#py-id").value } }); $("#py-id").value = ""; toast(`${p.name} added`); loadPayees(); }
+  catch (err) { $("#py-err").textContent = err.message; }
+});
+$("#tx-payee").addEventListener("change", () => $("#tx-new-wrap").classList.toggle("hidden", $("#tx-payee").value !== ""));
+let lookupT;
+$("#tx-new").addEventListener("input", () => {
+  clearTimeout(lookupT); const v = $("#tx-new").value.trim(); $("#tx-new-name").textContent = "";
+  if (v.length < 4) return;
+  lookupT = setTimeout(async () => {
+    try { const a = await api("/api/lookup/" + encodeURIComponent(v)); $("#tx-new-name").textContent = "Account holder: " + a.name; }
+    catch { $("#tx-new-name").textContent = "No account with that number"; }
+  }, 300);
+});
+
+let check = null, warnTimer = null, warnLeft = 0;
+$("#tx-form").addEventListener("submit", async e => {
+  e.preventDefault(); $("#tx-err").textContent = "";
+  const to = $("#tx-payee").value || $("#tx-new").value.trim();
+  if (!to) { $("#tx-err").textContent = "Choose a payee or enter an account number"; return; }
+  $("#tx-go").disabled = true; $("#tx-go").textContent = "Checking payee…";
+  try {
+    check = await api("/api/user/precheck", { body: { to_id: to, amount: $("#tx-amount").value, remarks: $("#tx-remarks").value } });
+    if (["medium", "high", "blocked"].includes(check.risk)) openWarning(); else openConfirm();
+  } catch (err) { $("#tx-err").textContent = err.message; }
+  finally { $("#tx-go").disabled = false; $("#tx-go").textContent = "Continue"; }
+});
+
+function openConfirm() {
+  $("#cf-kv").innerHTML = `<dt>To</dt><dd>${esc(check.payee_name)} <span class="mono muted">${esc(check.to_id)}</span></dd>
+    <dt>Amount</dt><dd><strong>${inr(check.amount)}</strong></dd>${check.remarks ? `<dt>Remarks</dt><dd>${esc(check.remarks)}</dd>` : ""}`;
+  $("#cf-note").textContent = check.available ? "✓ Checked by Bloodline: no warning signs found for this payee." : "Bloodline couldn't check this payee right now. Only pay people you know.";
+  $("#cf-err").textContent = ""; $("#confirm").classList.remove("hidden"); $("#cf-send").focus();
+}
+$("#cf-cancel").onclick = () => decide("cancel", "#confirm", "#cf-err");
+$("#cf-send").onclick = () => decide("send", "#confirm", "#cf-err");
+
+function openWarning() {
+  const r = check.risk, blocked = r === "blocked";
+  $("#warn-card").className = "card modal wide intercept " + (r === "medium" ? "medium" : "");
+  $("#warn-badge").className = "badge " + (r === "medium" ? "r-medium" : "r-high");
+  $("#warn-badge").textContent = blocked ? "Payment blocked" : r === "high" ? "Administrative hold recommended" : "Cooling-off delay triggered";
+  $("#warn-score").textContent = check.score != null ? `Risk ${pct(check.score)}` : "";
+  $("#warn-title").textContent = blocked ? "This payment can't be made" : "Scammers rush you. Pause for a moment.";
+  $("#warn-sub").innerHTML = blocked
+    ? `The bank has blocked <span class="mono">${esc(check.to_id)}</span>. Your money has not moved.`
+    : `${inr(check.amount)} to ${esc(check.payee_name)} <span class="mono">${esc(check.to_id)}</span>. Our fraud defence found signs that this account is being used to pass on stolen money.`;
+  $("#warn-reasons").innerHTML = (check.reasons.length ? check.reasons : ["This account receives money and passes it on quickly without keeping a balance."]).map(x => `<li>${esc(x)}</li>`).join("");
+  $("#warn-cf").textContent = check.counterfactual ? "What would make this account look safe: " + check.counterfactual : "";
+  $("#warn-cf").classList.toggle("hidden", !check.counterfactual || blocked);
+  $("#warn-ring").classList.toggle("hidden", blocked);
+  $("#warn-ack-wrap").classList.toggle("hidden", blocked);
+  $("#warn-send").classList.toggle("hidden", blocked);
+  $("#warn-call").classList.toggle("hidden", blocked);
+  $("#warn-help").classList.add("hidden");
+  $("#warn-cancel").textContent = blocked ? "Close" : "Cancel payment (protect my money)";
+  $("#warn-arc").style.stroke = r === "medium" ? "var(--med)" : "var(--high)";
+  $("#warn-ack").checked = false; $("#warn-err").textContent = "";
+  $("#warn").classList.remove("hidden"); document.body.classList.add("locked"); $("#warn-cancel").focus();
+  const total = check.wait_seconds, endAt = Date.now() + total * 1000;
+  clearInterval(warnTimer);
+  const tick = () => {
+    warnLeft = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
+    $("#warn-t").textContent = warnLeft;
+    $("#warn-arc").style.strokeDashoffset = total ? (251.3 * (1 - warnLeft / total)).toFixed(1) : 251.3;
+    $("#warn-ack").disabled = warnLeft > 0;
+    $("#warn-ack-wrap").classList.toggle("off", warnLeft > 0);
+    syncSend();
+    if (warnLeft <= 0) clearInterval(warnTimer);
+  };
+  tick(); warnTimer = setInterval(tick, 250);
+}
+function syncSend() {
+  const btn = $("#warn-send");
+  btn.disabled = warnLeft > 0 || !$("#warn-ack").checked;
+  btn.textContent = warnLeft > 0 ? `Proceed anyway in ${warnLeft}s` : "Proceed anyway";
+}
+$("#warn-ack").addEventListener("change", syncSend);
+$("#warn-call").onclick = () => $("#warn-help").classList.toggle("hidden");
+$("#warn-cancel").onclick = () => decide(check.risk === "blocked" ? "send" : "cancel", "#warn", "#warn-err");
+$("#warn-send").onclick = () => decide("send", "#warn", "#warn-err");
+$("#warn").addEventListener("keydown", e => {
+  if (e.key === "Escape") { e.preventDefault(); return; }
+  if (e.key !== "Tab") return;
+  const f = [...$("#warn").querySelectorAll("button:not(.hidden):not(:disabled), input:not(:disabled)")].filter(x => !x.closest(".hidden")); if (!f.length) return;
+  if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+  else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+});
+
+async function decide(decision, modal, errEl) {
+  const close = () => { clearInterval(warnTimer); $(modal).classList.add("hidden"); document.body.classList.remove("locked"); };
+  try {
+    const r = await api("/api/user/transfer", { body: { check_id: check.id, decision } });
+    close();
+    if (r.status === "completed") done("Payment sent", `${inr(r.amount)} sent to ${check.payee_name}. Reference ${r.ref}.`);
+    else done("Payment cancelled", "No money has left your account. Thank you for taking a moment to check.");
+    $("#tx-amount").value = ""; $("#tx-remarks").value = ""; refreshUser();
+  } catch (err) {
+    if (err.status === 403) { close(); done("Payment blocked", err.message + ". Your money has not moved."); refreshUser(); return; }
+    $(errEl).textContent = err.message;
+  }
+}
+function done(title, body) { $("#dn-title").textContent = title; $("#dn-body").textContent = body; $("#done").classList.remove("hidden"); $("#dn-ok").focus(); }
+$("#dn-ok").onclick = () => $("#done").classList.add("hidden");
+
+let adminTab = "a-monitor", reviewFilter = "pending", lastFeedId = 0, reviewStatus = {};
+function startAdmin() {
+  show("admin-view"); selectTab("#a-tabs", "a-monitor"); adminTab = "a-monitor";
+  every(1500, refreshAdmin);
+  every(3000, () => { if (adminTab === "a-review") loadReview(); });
+}
+const tabLoaders = {
+  "a-review": () => loadReview(),
+  "a-settings": () => loadSettings(),
+  "a-scan": () => { if (!scanned) runScan(SCENARIOS[0].id, SCENARIOS[0].amount); },
+  "a-analyst": () => loadAnalyst(),
+  "a-cases": () => loadCases(),
+  "a-shield": () => loadInvoices(),
+  "a-impact": () => loadImpact(),
+};
+setupTabs("#a-tabs", id => { adminTab = id; if (id !== "a-analyst") dnaPause(); tabLoaders[id] && tabLoaders[id](); });
+
+let simEditing = 0, bankStats = null;
+async function refreshAdmin() {
+  let s; try { s = await api("/api/admin/state"); } catch { return; }
+  const d = s.detector;
+  $("#a-detector").innerHTML = `<span class="dot ${d.ok === false ? "bad" : d.ok ? "ok" : ""}"></span>Detector ${d.ok === false ? "unreachable" : d.ok ? "online" : "waiting"}`;
+  const st = bankStats = s.stats;
+  const tiles = [["Transactions", st.total], ["Completed", st.completed], ["High risk", st.high], ["Medium risk", st.medium],
+    ["Cancelled after warning", st.cancelled], ["Blocked", st.blocked], ["Sent anyway", st.sent_anyway], ["Money protected", inrShort(st.saved)]];
+  const html = tiles.map(([k, v]) => `<div class="tile"><div class="v">${esc(v ?? 0)}</div><div class="k">${k}</div></div>`).join("");
+  $("#a-tiles").innerHTML = html; $("#a-tiles-2").innerHTML = html;
+  const pend = $("#a-pending"); pend.textContent = st.pending_review; pend.classList.toggle("hidden", !st.pending_review);
+  const newest = s.feed[0]?.id || 0;
+  const feedHtml = s.feed.map(t => `<tr class="${t.id > lastFeedId && lastFeedId ? "flash" : ""}">
+    <td class="small">${clock(t.ts)}</td>
+    <td>${esc(t.from_name)}<div class="mono muted small">${esc(t.from_id)}</div></td>
+    <td><a href="#" data-inv="${esc(t.to_id)}">${esc(t.to_name)}</a><div class="mono muted small">${esc(t.to_id)}</div></td>
+    <td class="num">${inr(t.amount)}</td><td>${riskBadge(t.risk)}</td><td class="num">${score(t.score)}</td>
+    <td>${badge("cap s-" + t.status, t.status === "completed" && ["medium", "high"].includes(t.risk) ? "sent anyway" : t.status)}</td>
+    <td class="small muted hide-sm">${t.source === "user" ? "Customer" : "Simulation"}</td></tr>`).join("") || `<tr><td colspan="8" class="empty">No transactions yet. Start the simulation, or log in as a customer and send a payment.</td></tr>`;
+  $("#a-feed").innerHTML = feedHtml; $("#a-feed-2").innerHTML = feedHtml;
+  lastFeedId = newest;
+  $("#a-feed-note").textContent = s.sim.on ? `Simulation running · ${s.sim.rings_running} mule ring(s) active` : "Simulation stopped";
+  const sim = s.sim;
+  $("#sim-status").className = "badge " + (sim.on ? "s-completed" : "r-unknown");
+  $("#sim-status").textContent = sim.on ? "Running" : "Stopped";
+  $("#sim-toggle").textContent = sim.on ? "Stop" : "Start";
+  $("#sim-toggle").dataset.on = sim.on ? "1" : "";
+  if (Date.now() - simEditing > 3000) {
+    $("#sim-rate").value = sim.rate; $("#sim-conc").value = sim.concurrency; $("#sim-heed").value = sim.heed; $("#sim-ring").value = sim.ring_every;
+    syncOutputs();
+  }
+  if (adminTab === "a-impact") renderBankImpact();
+}
+function syncOutputs() {
+  $("#sim-rate-o").textContent = (+$("#sim-rate").value).toFixed(1);
+  $("#sim-conc-o").textContent = $("#sim-conc").value;
+  $("#sim-heed-o").textContent = Math.round($("#sim-heed").value * 100) + "%";
+  $("#sim-ring-o").textContent = $("#sim-ring").value;
+}
+const simBody = () => ({ rate: +$("#sim-rate").value, concurrency: +$("#sim-conc").value, heed: +$("#sim-heed").value, ring_every: +$("#sim-ring").value });
+["#sim-rate", "#sim-conc", "#sim-heed", "#sim-ring"].forEach(id => {
+  $(id).addEventListener("input", () => { simEditing = Date.now(); syncOutputs(); });
+  $(id).addEventListener("change", () => { simEditing = Date.now(); api("/api/admin/sim", { body: simBody() }); });
+});
+$("#sim-toggle").onclick = async () => { await api("/api/admin/sim", { body: { ...simBody(), on: !$("#sim-toggle").dataset.on } }); refreshAdmin(); };
+$("#sim-ring-btn").onclick = async () => { await api("/api/admin/sim/ring", { body: {} }); toast("Mule ring launched"); };
+$("#burst-btn").onclick = async () => {
+  const b = $("#burst-btn"); b.disabled = true; $("#burst-out").textContent = "Running…";
+  try { const r = await api("/api/admin/sim/burst", { body: { count: +$("#burst-n").value } }); $("#burst-out").textContent = `${r.count} payments scanned in ${r.seconds}s`; }
+  catch (err) { $("#burst-out").textContent = err.message; }
+  b.disabled = false; refreshAdmin();
+};
+$("#reset-btn").onclick = async () => {
+  if (!confirm("Clear all transactions, payees and account reviews?")) return;
+  await api("/api/admin/reset", { body: {} }); lastFeedId = 0; toast("Bank activity cleared"); refreshAdmin(); loadReview();
+};
+
+filterGroup("#rv-filters", f => { reviewFilter = f; loadReview(); });
+async function loadReview() {
+  const rows = await api("/api/admin/suspicious").catch(() => null); if (!rows) return;
+  reviewStatus = Object.fromEntries(rows.map(r => [r.id, r.status]));
+  const list = rows.filter(r => reviewFilter === "all" || (reviewFilter === "pending" ? !r.status : r.status === reviewFilter));
+  $("#rv-list").innerHTML = list.map(r => `<tr>
+    <td><a href="#" data-inv="${esc(r.id)}">${esc(r.name)}</a><div class="mono muted small">${esc(r.id)}</div></td>
+    <td>${r.hits ? riskBadge(r.risk) : ""}</td><td class="num">${score(r.max_score)}</td><td class="num">${r.payers}</td>
+    <td class="num hide-sm">${inr(r.attempted)}</td><td class="num hide-sm">${inr(r.received)}</td>
+    <td class="small hide-sm">${r.last_seen ? when(r.last_seen) : "–"}</td>
+    <td>${statusBadge(r.status)}</td>
+    <td style="white-space:nowrap">${actionButtons(r.id, r.status)}</td></tr>`).join("")
+    || `<tr><td colspan="9" class="empty">${reviewFilter === "pending" ? "Nothing waiting for review." : "No accounts here."}</td></tr>`;
+}
+const statusBadge = s => badge("cap s-" + (s || "pending"), s || "needs review");
+function actionButtons(id, status) {
+  const b = (a, label, cls = "") => status === { flag: "flagged", block: "blocked", ignore: "ignored" }[a] ? "" : `<button class="btn sm ${cls}" data-act="${a}" data-id="${esc(id)}">${label}</button> `;
+  return b("flag", "Flag") + b("block", "Block", "danger") + b("ignore", "Ignore") + (status ? `<button class="btn sm" data-act="clear" data-id="${esc(id)}">Undo</button>` : "");
+}
+async function currentStatus(id) {
+  const rows = await api("/api/admin/suspicious").catch(() => []);
+  reviewStatus = Object.fromEntries(rows.map(r => [r.id, r.status]));
+  return reviewStatus[id] || null;
+}
+document.addEventListener("click", async e => {
+  const act = e.target.closest("[data-act]");
+  if (act) {
+    const id = act.dataset.id, a = act.dataset.act;
+    act.disabled = true;
+    try {
+      await reviewAction(id, a);
+      toast({ flag: "Account flagged", block: "Account blocked and lien requested", ignore: "Marked as genuine", clear: "Review undone" }[a]);
+    } catch (err) { toast(err.message); }
+    loadReview();
+    if (!$("#drawer").classList.contains("hidden")) investigate(id);
+    if (adminTab === "a-scan" && scanned?.account_id === id) renderScanActions(id);
+    if (adminTab === "a-analyst") { if (dna.data) loadDNA(dna.chain, true); if (dna.sel === id) inspectNode(id); if (!$("#an-mules").classList.contains("hidden")) loadMules(); }
+    return;
+  }
+  const inv = e.target.closest("[data-inv]");
+  if (inv) { e.preventDefault(); investigate(inv.dataset.inv); }
+});
+
+async function investigate(id) {
+  $("#drawer").classList.remove("hidden"); $("#dr-title").textContent = id;
+  $("#dr-body").innerHTML = `<div class="muted">Asking Bloodline…</div>`;
+  const [scan, txns, status] = await Promise.all([
+    api(`/api/admin/accounts/${encodeURIComponent(id)}/scan`).catch(err => ({ error: err.message })),
+    api(`/api/admin/accounts/${encodeURIComponent(id)}/transfers`).catch(() => []),
+    currentStatus(id),
+  ]);
+  let html = `<div class="row">${statusBadge(status)}<span class="spacer"></span>${actionButtons(id, status)}</div>`;
+  if (scan.error) html += `<div class="note bad">${esc(scan.error)}</div>`;
+  else {
+    $("#dr-title").textContent = scan.account_label + " · " + id;
+    html += `<div class="card"><h3>Detector verdict</h3><dl class="kv">
+      <dt>Verdict</dt><dd><strong>${esc(scan.verdict)}</strong></dd>
+      <dt>Mule probability</dt><dd>${pct(scan.probability)} <div class="bar" style="margin-top:.3rem"><span style="width:${scan.probability * 100}%"></span></div></dd>
+      <dt>Anomaly score</dt><dd>${pct(scan.iso_anomaly_score, 0)}</dd>
+      <dt>Hold / delay at</dt><dd>${score(scan.threshold_hold)} / ${score(scan.threshold_delay)}</dd></dl>
+      <ul class="reasons" style="margin-top:.7rem">${(scan.plain_language_reasons || []).map(r => `<li>${esc(r)}</li>`).join("")}</ul></div>
+      <div class="card"><h3>Top model signals (SHAP)</h3>${shapBars(scan.top_reasons)}</div>`;
+  }
+  html += `<div class="card"><h3>Activity at this bank</h3><div class="table-wrap"><table><tbody>${txns.map(t => `<tr><td class="small">${clock(t.ts)}</td>
+    <td class="small">${t.to_id === id ? "In from" : "Out to"} ${esc(t.to_id === id ? t.from_name : t.to_name)}</td><td class="num small">${inr(t.amount)}</td>
+    <td>${badge("cap s-" + t.status, t.status)}</td></tr>`).join("") || `<tr><td class="empty">No activity yet.</td></tr>`}</tbody></table></div></div>
+    <div class="row"><button class="btn sm" data-scan-acc="${esc(id)}">Open in pre-payment scan</button><button class="btn sm" data-dna-acc="${esc(id)}">Trace in Money DNA</button></div>`;
+  $("#dr-body").innerHTML = html;
+}
+$("#dr-close").onclick = () => $("#drawer").classList.add("hidden");
+document.addEventListener("click", async e => {
+  const s = e.target.closest("[data-scan-acc]"), d = e.target.closest("[data-dna-acc]");
+  if (s) { $("#drawer").classList.add("hidden"); goTab("a-scan"); runScan(s.dataset.scanAcc, +$("#sc-amount").value || 50000); }
+  if (d) { $("#drawer").classList.add("hidden"); traceAccount(d.dataset.dnaAcc); }
+});
+function goTab(id) { selectTab("#a-tabs", id); adminTab = id; if (id !== "a-analyst") dnaPause(); }
+
+function shapBars(reasons) {
+  if (!reasons?.length) return `<div class="muted small">No signals returned.</div>`;
+  const max = Math.max(...reasons.map(r => Math.abs(r.contribution)), 0.001);
+  return reasons.map(r => {
+    const v = typeof r.feature_value === "number" ? +r.feature_value.toFixed(2) : r.feature_value;
+    return `<div class="shap"><div class="row"><span title="${esc(r.label)}">${esc(r.label)}</span><span class="spacer"></span><span class="mono" style="color:${r.contribution > 0 ? "var(--high)" : "var(--low)"}">${r.contribution > 0 ? "+" : ""}${r.contribution.toFixed(3)}</span></div>
+      <div class="bar" data-tip="${esc(r.label)}<br>Feature value: <b>${esc(v)}</b><br>Contribution: <b>${r.contribution.toFixed(3)}</b>"><span style="width:${Math.max(4, Math.abs(r.contribution) / max * 100)}%;background:${r.contribution > 0 ? "var(--high)" : "var(--low)"}"></span></div></div>`;
+  }).join("");
+}
+
+const SCENARIOS = [
+  { id: "ACC02228", label: "Neha Bose", desc: "Mule L1 hub · CH03", amount: 95000, risk: "High risk" },
+  { id: "ACC02233", label: "Nisha Rao", desc: "Layer 2 dispersal", amount: 82700, risk: "High risk" },
+  { id: "ACC02041", label: "Reddy Stores", desc: "Merchant shopkeeper", amount: 1500, risk: "Legitimate" },
+  { id: "ACC02108", label: "Arjun Bose", desc: "New genuine customer", amount: 12000, risk: "Legitimate" },
+];
+let scanned = null;
+$("#scan-scenarios").innerHTML = SCENARIOS.map(s => `<button type="button" class="scenario" data-sc="${s.id}"><b>${esc(s.label)}</b><span class="muted">${esc(s.desc)}</span><div class="row" style="justify-content:space-between;margin-top:.2rem"><span class="mono">${inrShort(s.amount)}</span>${badge(s.risk === "High risk" ? "r-high" : "r-low", s.risk)}</div></button>`).join("");
+$("#scan-scenarios").addEventListener("click", e => { const b = e.target.closest("[data-sc]"); if (!b) return; const s = SCENARIOS.find(x => x.id === b.dataset.sc); runScan(s.id, s.amount); });
+$("#scan-form").addEventListener("submit", e => { e.preventDefault(); runScan($("#sc-payee").value.trim(), +$("#sc-amount").value); });
+
+async function runScan(payee, amount) {
+  $("#sc-payee").value = payee; $("#sc-amount").value = amount; $("#sc-err").textContent = "";
+  $$(".scenario").forEach(b => b.classList.toggle("on", b.dataset.sc === payee));
+  $("#sc-go").disabled = true; $("#sc-go").textContent = "Evaluating live model…";
+  try {
+    const body = { payee_account_id: payee, amount, remark: $("#sc-remark").value };
+    if ($("#sc-sender").value.trim()) body.sender_account_id = $("#sc-sender").value.trim();
+    scanned = await det("scan", body);
+    renderScan(scanned, amount);
+  } catch (err) { $("#sc-err").textContent = err.message; }
+  finally { $("#sc-go").disabled = false; $("#sc-go").textContent = "Scan pre-payment risk"; }
+}
+function gauge(p, verdict) {
+  const r = 70, cx = 90, cy = 86, a = Math.PI * (1 - p), x = cx + r * Math.cos(a), y = cy - r * Math.sin(a);
+  const color = verdict === "HOLD" ? "var(--high)" : verdict === "DELAY" ? "var(--med)" : "var(--low)";
+  return `<svg class="gauge" width="180" height="110" viewBox="0 0 180 110" role="img" aria-label="Mule probability ${pct(p)}">
+    <path d="M20 86 A70 70 0 0 1 160 86" fill="none" style="stroke:var(--surface-2)" stroke-width="14" stroke-linecap="round"/>
+    ${p > 0.005 ? `<path d="M20 86 A70 70 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)}" fill="none" style="stroke:${color}" stroke-width="14" stroke-linecap="round"/>` : ""}
+    <text x="90" y="78" text-anchor="middle" font-size="26" font-weight="700" style="fill:var(--text)">${pct(p)}</text>
+    <text x="90" y="100" text-anchor="middle" font-size="11" style="fill:var(--muted)">mule probability</text></svg>`;
+}
+function renderScan(d, amount) {
+  const vClass = d.verdict === "HOLD" ? "r-high" : d.verdict === "DELAY" ? "r-medium" : "r-low";
+  $("#scan-result").innerHTML = `<div class="card stack">
+    <div class="gauge-wrap">${gauge(d.probability, d.verdict)}
+      <div style="flex:1;min-width:200px">
+        <div class="row" style="gap:.5rem"><strong class="mono" style="font-size:1.05rem">${esc(d.account_id)}</strong>${badge("s-neutral", d.bank_id)}${badge(vClass, d.verdict)}</div>
+        <div style="margin:.2rem 0 .5rem">${esc(d.account_label)}</div>
+        <div class="chips">${badge("s-neutral", "Isolation-forest outlier " + pct(d.iso_anomaly_score, 0))}${d.honeypot_proximity_boost > 0 ? badge("r-high", "Honeypot proximity +" + pct(d.honeypot_proximity_boost, 0)) : ""}${badge("s-neutral", "Hold ≥ " + score(d.threshold_hold) + " · Delay ≥ " + score(d.threshold_delay))}</div>
+      </div></div>
+    <div class="row" id="scan-actions"></div>
+    ${d.plain_language_reasons?.length ? `<div><div class="eyebrow">What the customer is told</div><ul class="reasons">${d.plain_language_reasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul></div>` : ""}
+    ${d.counterfactual ? `<div class="note info small"><strong>Counterfactual:</strong> ${esc(d.counterfactual)}</div>` : ""}
+    <div><div class="eyebrow">Top reason contributions (TreeSHAP)</div>${shapBars(d.top_reasons)}</div>
+    ${d.next_hops?.length ? `<div><div class="eyebrow">Predicted downstream next hops</div><div class="hops">${d.next_hops.map(hopCard).join("")}</div></div>` : ""}
+    ${d.timeline?.length ? `<div><div class="eyebrow">Recent ledger activity</div><div class="table-wrap"><table><tbody>${d.timeline.map(t => `<tr><td class="small">${esc(isoShort(t.timestamp))}</td><td>${badge(t.type === "INFLOW" ? "s-info" : "s-warn", t.type === "INFLOW" ? "In" : "Out")}</td><td class="mono small">${esc(t.counterparty)}</td><td class="num small">${inr(t.amount)}</td><td class="small muted">${esc(t.channel)}</td></tr>`).join("")}</tbody></table></div></div>` : ""}
+  </div>`;
+  renderScanActions(d.account_id);
+}
+async function renderScanActions(id) {
+  const status = await currentStatus(id), el = $("#scan-actions"); if (!el) return;
+  el.innerHTML = `<span class="small muted">Bank review:</span> ${statusBadge(status)} ${actionButtons(id, status)}<span class="spacer"></span><button class="btn sm" data-dna-acc="${esc(id)}">Trace in Money DNA</button>`;
+}
+const hopCard = h => `<div class="hop"><div class="row"><strong class="mono">${esc(h.account_id)}</strong><span class="spacer"></span><strong style="color:var(--med)">${score(h.probability)}</strong></div>
+  <div>${esc(h.label || "")}</div><div class="muted xs">${esc(h.reason || "")}${h.is_held ? " · held" : ""}</div></div>`;
+
+const LAYERS = [["Layer 0 · Origin", "Victim debit / recruiter"], ["Layer 1 · Aggregators", "Rapid inflow consolidation"], ["Layer 2 · Dispersal", "High-velocity smurfing"], ["Layer 3 · Cash-out", "ATM / crypto / hawala exits"]];
+const dna = { chain: null, data: null, step: 0, playing: null, sel: null, chains: [] };
+let mules = [], ledger = [], ledgerFilter = "all", muleFilter = "all", anSub = "an-dna";
+
+$("#an-sub").addEventListener("click", e => {
+  const b = e.target.closest("[data-sub]"); if (!b) return;
+  anSub = b.dataset.sub; $$("#an-sub .btn").forEach(x => x.classList.toggle("on", x === b));
+  ["an-dna", "an-ledger", "an-mules"].forEach(id => $("#" + id).classList.toggle("hidden", id !== anSub));
+  if (anSub !== "an-dna") dnaPause();
+  if (anSub === "an-ledger") loadLedger();
+  if (anSub === "an-mules") loadMules();
+});
+
+async function loadAnalyst() {
+  if (!dna.chains.length) {
+    try {
+      dna.chains = (await det("chains")).chains;
+      $("#dna-chain").innerHTML = dna.chains.map(c => `<option value="${esc(c.chain_id)}">${esc(c.chain_id)} · ${c.transfers} transfers · ${inrShort(c.volume)}</option>`).join("");
+    } catch (err) { $("#dna-canvas").innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
+  }
+  if (!dna.data) loadDNA(dna.chain || "CH03");
+}
+$("#dna-chain").addEventListener("change", () => loadDNA($("#dna-chain").value));
+
+async function loadDNA(chain, keepStep) {
+  dnaPause();
+  try {
+    const d = await det("lineage/" + encodeURIComponent(chain));
+    d.links.sort((a, b) => a.epoch_seconds - b.epoch_seconds);
+    const prevLen = dna.data?.links.length;
+    dna.chain = d.chain_id; dna.data = d;
+    if (!keepStep || prevLen !== d.links.length) dna.step = d.links.length;
+    $("#dna-chain").value = d.chain_id;
+    $("#dna-slider").max = d.links.length; $("#dna-slider").value = dna.step;
+    if (!dna.sel || !d.nodes.some(n => n.account_id === dna.sel)) dna.sel = (d.nodes.find(n => n.layer === 1) || d.nodes[0])?.account_id;
+    renderDNA(); if (!keepStep) inspectNode(dna.sel);
+  } catch (err) { $("#dna-canvas").innerHTML = `<div class="empty">${esc(err.message)}</div>`; }
+}
+
+function renderDNA() {
+  const d = dna.data; if (!d) return;
+  const colW = 290, cardW = 188, cardH = 56, gap = 72, top = 64, cols = [[], [], [], []];
+  d.nodes.forEach(n => cols[Math.min(3, Math.max(0, n.layer))].push(n));
+  cols.forEach(c => c.sort((a, b) => (b.inflow + b.outflow) - (a.inflow + a.outflow)));
+  const maxN = Math.max(1, ...cols.map(c => c.length));
+  const H = top + maxN * gap + 10, W = 24 + 4 * colW;
+  const pos = {};
+  cols.forEach((c, li) => {
+    const off = (maxN - c.length) * gap / 2;
+    c.forEach((n, i) => pos[n.id] = { x: 24 + li * colW + 6, y: top + off + i * gap, n });
+  });
+  const active = new Set(), revealedInto = {};
+  d.links.forEach((l, i) => { if (i < dna.step) { active.add(l.source); active.add(l.target); revealedInto[l.target] = (revealedInto[l.target] || 0) + l.amount; } });
+  let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Money DNA flow for chain ${esc(d.chain_id)}">`;
+  LAYERS.forEach(([t, sub], i) => {
+    const x = 24 + i * colW;
+    s += `<rect class="dna-col" x="${x}" y="8" width="${cardW + 12}" height="${H - 16}" rx="12"/><text class="dna-head" x="${x + 10}" y="30">${t}</text><text class="dna-headsub" x="${x + 10}" y="46">${sub}</text>`;
+  });
+  const showAmt = d.links.length <= 30;
+  d.links.forEach((l, i) => {
+    const a = pos[l.source], b = pos[l.target]; if (!a || !b) return;
+    const x1 = a.x + cardW, y1 = a.y + cardH / 2, x2 = b.x - 2, y2 = b.y + cardH / 2, dx = Math.abs(x2 - x1) * .45;
+    const path = `M${x1} ${y1} C${x1 + dx} ${y1} ${x2 - dx} ${y2} ${x2} ${y2}`;
+    const on = i < dna.step, held = on && (l.is_held || b.n.is_held), cls = !on ? "off" : held ? "held" : "on";
+    const tip = `<b>${esc(l.source_account)} → ${esc(l.target_account)}</b><br>${inr(l.amount)} · ${esc(l.channel)}<br>${esc(isoShort(l.timestamp))}${on ? "" : "<br><i>not yet replayed</i>"}`;
+    s += `<path class="dna-link ${cls}${i === dna.step - 1 ? " now" : ""}" d="${path}" marker-end="url(#arr-${cls})"/><path class="dna-hit" d="${path}" data-tip="${tip}"/>`;
+    if (showAmt && on) {
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      s += `<g pointer-events="none"><rect class="dna-amt-bg" x="${mx - 34}" y="${my - 9}" width="68" height="18" rx="5"/><text class="dna-amt" x="${mx}" y="${my + 4}" text-anchor="middle">${inrShort(l.amount)}</text></g>`;
+    }
+  });
+  Object.values(pos).forEach(({ x, y, n }) => {
+    const cls = ["dna-node", "l" + Math.min(3, n.layer), n.is_held ? "held" : "", n.account_id === dna.sel ? "sel" : "", active.has(n.id) || dna.step === 0 && n.layer === 0 ? "" : "dim"].join(" ");
+    const vol = n.layer === 0 ? n.outflow : revealedInto[n.id] ?? 0;
+    const label = n.label.length > 22 ? n.label.slice(0, 21) + "…" : n.label;
+    s += `<g class="${cls}" data-node="${esc(n.account_id)}" tabindex="0" role="button" aria-label="${esc(n.label)} ${esc(n.account_id)}" data-tip="<b>${esc(n.label)}</b><br>${esc(n.account_id)} · ${esc(n.role)}<br>In ${inr(n.inflow)} · Out ${inr(n.outflow)}${n.is_held ? "<br><b>Lien hold active</b>" : ""}">
+      <rect x="${x}" y="${y}" width="${cardW}" height="${cardH}" rx="9"/>
+      <text x="${x + 10}" y="${y + 18}" font-weight="700" class="mono">${esc(n.account_id)}</text>
+      <text x="${x + cardW - 10}" y="${y + 18}" text-anchor="end" class="sub">${n.is_held ? "HELD" : esc(n.role.replace("MULE_", "").replace("CASHOUT_EXTERNAL", "CASH-OUT"))}</text>
+      <text x="${x + 10}" y="${y + 34}" class="sub">${esc(label)}</text>
+      <text x="${x + 10}" y="${y + 49}" class="sub">${n.layer === 0 ? "Debited" : "Received"} <tspan style="fill:var(--text)" font-weight="700">${inrShort(vol)}</tspan></text></g>`;
+  });
+  $("#dna-canvas").innerHTML = s + "</svg>";
+  const cur = d.links[dna.step - 1];
+  $("#dna-step").textContent = `Step ${dna.step} of ${d.links.length}`;
+  $("#dna-now").textContent = cur ? `${isoShort(cur.timestamp)} · ${cur.source_account} → ${cur.target_account} · ${inrShort(cur.amount)}` : "Before the first transfer";
+  const moved = d.links.slice(0, dna.step).reduce((t, l) => t + l.amount, 0);
+  $("#dna-taint").textContent = `${d.links.length ? Math.round(dna.step / d.links.length * 100) : 0}% replayed`;
+  $("#dna-slider").value = dna.step;
+  $("#dna-play").textContent = dna.playing ? "Pause" : "Play";
+  $("#dna-tiles").innerHTML = [["Total stolen tracked", inrShort(d.total_tracked_inr)], ["Moved so far in replay", inrShort(moved)],
+    ["Intercepted / held", inrShort(d.total_held_inr)], ["Reached cash-out", inrShort(d.total_exited_inr)], ["Accounts in chain", d.nodes.length]]
+    .map(([k, v]) => `<div class="tile"><div class="v">${v}</div><div class="k">${k}</div></div>`).join("");
+}
+$("#dna-canvas").addEventListener("click", e => { const g = e.target.closest("[data-node]"); if (g) inspectNode(g.dataset.node); });
+$("#dna-canvas").addEventListener("keydown", e => { const g = e.target.closest("[data-node]"); if (g && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); inspectNode(g.dataset.node); } });
+$("#dna-slider").addEventListener("input", () => { dnaPause(); dna.step = +$("#dna-slider").value; renderDNA(); });
+$("#dna-rewind").onclick = () => { dnaPause(); dna.step = 0; renderDNA(); };
+$("#dna-play").onclick = () => {
+  if (dna.playing) { dnaPause(); renderDNA(); return; }
+  if (!dna.data) return;
+  if (dna.step >= dna.data.links.length) dna.step = 0;
+  dna.playing = setInterval(() => {
+    dna.step++;
+    if (dna.step >= dna.data.links.length) { dna.step = dna.data.links.length; dnaPause(); }
+    renderDNA();
+  }, 700);
+  renderDNA();
+};
+function dnaPause() { if (dna.playing) { clearInterval(dna.playing); dna.playing = null; } }
+function dnaStop() { dnaPause(); }
+
+async function inspectNode(id) {
+  if (!id || !dna.data) return;
+  dna.sel = id; renderDNA();
+  const nodes = dna.data.nodes.filter(n => n.account_id === id), n = nodes[0];
+  const inflow = nodes.reduce((t, x) => t + x.inflow, 0), outflow = nodes.reduce((t, x) => t + x.outflow, 0);
+  const status = await currentStatus(id);
+  $("#dna-inspect").innerHTML = `<div class="row"><h3 style="margin:0">${esc(n.label)}</h3><span class="spacer"></span>${n.is_held ? badge("s-ok", "Lien hold active") : badge("s-warn", "Unlocked / active")}</div>
+    <div class="mono muted small" style="margin:.2rem 0 .8rem">${esc(id)} · ${esc(n.role)}</div>
+    <dl class="kv"><dt>Bank</dt><dd>${esc(n.bank_id)}</dd><dt>Graph layer</dt><dd>Layer ${n.layer}</dd>
+      <dt>Inbound in chain</dt><dd>${inr(inflow)}</dd><dt>Outbound in chain</dt><dd>${inr(outflow)}</dd><dt>Bank review</dt><dd>${statusBadge(status)}</dd></dl>
+    <div class="row" style="margin-top:1rem">
+      <button class="btn primary sm" data-act="block" data-id="${esc(id)}" ${status === "blocked" && n.is_held ? "disabled" : ""}>${status === "blocked" && n.is_held ? "Lien confirmed (frozen)" : "Request lien hold & block"}</button>
+      <button class="btn sm" id="dna-handoff" data-acc="${esc(id)}" data-amt="${inflow || outflow}">Transmit cross-bank handoff</button>
+      <a href="#" class="btn sm" data-inv="${esc(id)}">Full investigation</a>
+    </div>`;
+  $("#dna-hops").innerHTML = `<h3>Predicted next hops</h3><div class="muted small">Asking the next-hop model…</div>`;
+  try {
+    const sc = await det("scan", { payee_account_id: id, amount: inflow || 50000 });
+    $("#dna-hops").innerHTML = `<h3>Predicted next hops</h3><p class="small muted" style="margin:.2rem 0 .7rem">Where money landing in ${esc(id)} is most likely to go next.</p>` +
+      (sc.next_hops?.length ? `<div class="stack">${sc.next_hops.map(hopCard).join("")}</div>` : `<div class="empty">No likely next hops.</div>`);
+  } catch (err) { $("#dna-hops").innerHTML = `<h3>Predicted next hops</h3><div class="note bad">${esc(err.message)}</div>`; }
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("#dna-handoff"); if (!b) return;
+  b.disabled = true;
+  try {
+    const r = await det("trace-handoff", { case_id: "CASE-" + dna.chain, transfer_ref: "REF-" + b.dataset.acc, receiver_account: b.dataset.acc, amount: +b.dataset.amt || 0, reason_codes: ["RAPID_PASS_THROUGH", "SHARED_HARDWARE_CLUSTER"] });
+    note("#an-handoff", `Privacy-preserving handoff sent. Token ${r.handoff_token} · destination ${r.destination_bank} · account shared as ${r.receiver_account_token} · raw ledger shared: ${r.raw_ledger_shared ? "yes" : "no"}.`);
+  } catch (err) { note("#an-handoff", err.message, "bad"); }
+  b.disabled = false;
+});
+async function traceAccount(id) {
+  goTab("a-analyst"); $$("#an-sub .btn")[0].click();
+  await loadAnalyst();
+  if (!mules.length) mules = (await det("mules").catch(() => ({ mules: [] }))).mules;
+  const m = mules.find(x => x.id === id);
+  if (m?.chain_id && dna.chains.some(c => c.chain_id === m.chain_id)) { await loadDNA(m.chain_id); }
+  if (dna.data?.nodes.some(n => n.account_id === id)) inspectNode(id);
+  else toast(`${id} isn't part of a known mule chain`);
+}
+
+async function loadLedger() {
+  $("#lg-list").innerHTML = `<tr><td colspan="8" class="empty">Loading…</td></tr>`;
+  ledger = (await det("transactions?limit=300").catch(() => ({ transactions: [] }))).transactions;
+  renderLedger();
+}
+function renderLedger() {
+  const q = $("#lg-search").value.trim().toLowerCase();
+  const rows = ledger.filter(t => (!q || [t.id, t.sender, t.sender_name, t.receiver, t.receiver_name].some(v => String(v || "").toLowerCase().includes(q)))
+    && (ledgerFilter === "all" || (ledgerFilter === "mule" ? t.is_mule_flow === 1 : t.status.includes("HELD"))));
+  $("#lg-list").innerHTML = rows.slice(0, 150).map(t => `<tr><td class="small">${esc(isoShort(t.ts))}</td><td class="mono small">${esc(t.id)}</td>
+    <td>${esc(t.sender_name || t.sender)}<div class="mono muted xs">${esc(t.sender)}</div></td>
+    <td>${esc(t.receiver_name || t.receiver)}<div class="mono muted xs">${esc(t.receiver)}</div></td>
+    <td class="num">${inr(t.amount)}</td><td class="hide-sm small">${esc(t.channel)}</td>
+    <td>${badge(t.status.includes("HELD") ? "s-ok" : t.is_mule_flow ? "s-bad" : "s-neutral", t.status)}</td>
+    <td><button class="btn sm" data-dna-acc="${esc(t.receiver)}">Inspect</button></td></tr>`).join("") || `<tr><td colspan="8" class="empty">No transactions match.</td></tr>`;
+  $("#lg-count").textContent = `Showing ${Math.min(150, rows.length)} of ${rows.length} ledger entries.`;
+}
+$("#lg-search").addEventListener("input", renderLedger);
+$("#lg-refresh").onclick = loadLedger;
+filterGroup("#lg-filters", f => { ledgerFilter = f; renderLedger(); });
+
+async function loadMules() {
+  mules = (await det("mules").catch(() => ({ mules: [] }))).mules;
+  renderMules();
+}
+function renderMules() {
+  const q = $("#mu-search").value.trim().toLowerCase();
+  const rows = mules.filter(m => (!q || [m.id, m.pseudonymous_label, m.chain_id].some(v => String(v || "").toLowerCase().includes(q)))
+    && (muleFilter === "all" || (muleFilter === "held" ? m.is_held : muleFilter === "L1" ? m.layer === 1 : m.layer === 2)));
+  $("#mu-list").innerHTML = rows.map(m => `<tr><td>${esc(m.pseudonymous_label)}<div class="mono muted xs">${esc(m.id)}</div></td>
+    <td class="small">${esc(m.role)}</td><td class="mono small">${esc(m.chain_id || "–")}</td><td class="num">${m.layer}</td>
+    <td class="num hide-sm">${m.shared_devices}</td><td class="num hide-sm">${inrShort(m.current_balance)}</td><td class="hide-sm small">${esc(m.kyc_tier)}</td>
+    <td>${m.is_held ? badge("s-ok", "Held") : badge("s-warn", "Active")}</td>
+    <td style="white-space:nowrap"><button class="btn sm" data-dna-acc="${esc(m.id)}">Money DNA</button> ${m.is_held ? "" : `<button class="btn sm danger" data-act="block" data-id="${esc(m.id)}">Hold</button>`}</td></tr>`).join("")
+    || `<tr><td colspan="9" class="empty">No mules match.</td></tr>`;
+}
+$("#mu-search").addEventListener("input", renderMules);
+filterGroup("#mu-filters", f => { muleFilter = f; renderMules(); });
+
+let cases = [], selCase = null, pendingSignoff = null;
+async function loadCases() {
+  try { cases = await det("cases"); } catch (err) { $("#cs-list").innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
+  cases = Array.isArray(cases) ? cases : cases.cases || [];
+  if (!selCase || !cases.some(c => c.case_id === selCase)) selCase = cases[0]?.case_id;
+  renderCases();
+}
+const showCauseLeft = c => Math.max(0, 21 - c.elapsed_days);
+const fmrLeft = c => Math.max(0, 14 - Math.max(0, c.elapsed_days - 21));
+const stageLabel = s => String(s || "").replace(/_/g, " ").toLowerCase();
+function renderCases() {
+  $("#cs-count").textContent = `${cases.length} cases`;
+  $("#cs-list").innerHTML = cases.map(c => `<div class="case-card ${c.case_id === selCase ? "on" : ""}" data-case="${esc(c.case_id)}" tabindex="0" role="button">
+    <div class="row"><strong class="mono">${esc(c.case_id)}</strong><span class="spacer"></span>${badge("cap s-neutral", stageLabel(c.stage))}</div>
+    <div class="small" style="margin:.25rem 0">Account <span class="mono">${esc(c.account_id)}</span></div>
+    <div class="row xs"><span style="color:var(--med)">Show-cause: ${showCauseLeft(c)}d left</span>${c.stage === "CLASSIFIED" ? `<span style="color:var(--high)">FMR: ${fmrLeft(c)}d left</span>` : ""}<span class="spacer"></span><span class="muted">Day ${c.elapsed_days}</span></div></div>`).join("") || `<div class="empty">No cases.</div>`;
+  const c = cases.find(x => x.case_id === selCase);
+  if (!c) { $("#cs-detail").innerHTML = `<div class="empty">Select a case.</div>`; return; }
+  let ev = {}; try { ev = JSON.parse(c.evidence_json || "{}"); } catch {}
+  $("#cs-detail").innerHTML = `<div class="row"><h3 style="margin:0">Forensic dossier</h3><span class="spacer"></span><span class="mono">${esc(c.case_id)}</span>${badge("cap s-neutral", stageLabel(c.stage))}${c.human_approved ? badge("s-ok", "Human approved") : ""}</div>
+    <div class="tiles" style="margin:.9rem 0">
+      <div class="tile"><div class="k">Show-cause representation</div><div class="clock" style="color:var(--med)">${showCauseLeft(c)} days left</div><div class="d">Section 35A BR Act clock (21 days)</div></div>
+      <div class="tile"><div class="k">FMR filing</div><div class="clock" style="color:var(--high)">${c.stage === "CLASSIFIED" ? fmrLeft(c) + " days left" : "Standby"}</div><div class="d">Central fraud registry (14 days)</div></div>
+    </div>
+    <div class="row small" style="margin-bottom:.8rem"><span class="muted">Account</span> <a href="#" class="mono" data-inv="${esc(c.account_id)}">${esc(c.account_id)}</a>${ev.chain_id ? `<span class="muted">Chain</span><span class="mono">${esc(ev.chain_id)}</span>` : ""}${ev.inbound_24h != null ? `<span class="muted">Inbound 24h</span>${inr(ev.inbound_24h)}` : ""}</div>
+    <div class="eyebrow">Investigation summary</div><div class="doc">${esc(c.llm_case_summary || "Dossier in preparation.")}</div>
+    <div class="row" style="margin-top:.9rem"><div class="eyebrow" style="margin:0">Statutory notice draft (Section 35A)</div><span class="spacer"></span><span class="xs" style="color:var(--med)">Requires human approval</span></div>
+    <div class="doc mono" style="margin-top:.35rem">${esc(c.show_cause_draft || "Notice draft not generated yet.")}</div>
+    <div class="row" style="margin-top:1rem">
+      <button class="btn primary sm" data-signoff="SHOW_CAUSE_ISSUED">Approve show-cause notice</button>
+      <button class="btn sm" data-signoff="CLASSIFIED">Confirm fraud classification</button>
+      <button class="btn sm" data-signoff="FMR_FILED">File FMR</button>
+      <span class="spacer"></span>
+      <button class="btn sm" data-fb="FALSE_POSITIVE">Mark false positive</button>
+      <button class="btn sm danger" data-fb="CONFIRMED_MULE">Confirm mule</button>
+    </div>`;
+}
+$("#cs-list").addEventListener("click", e => { const c = e.target.closest("[data-case]"); if (c) { selCase = c.dataset.case; renderCases(); } });
+$("#cs-list").addEventListener("keydown", e => { const c = e.target.closest("[data-case]"); if (c && e.key === "Enter") { selCase = c.dataset.case; renderCases(); } });
+$$("[data-days]").forEach(b => b.addEventListener("click", async () => {
+  if (!selCase) return;
+  try { const r = await det(`case/${encodeURIComponent(selCase)}/advance`, { simulate_days: +b.dataset.days, human_approved: true }); note("#cs-msg", `${selCase}: now day ${r.elapsed_days}. Show-cause ${r.show_cause_countdown_days}d left.`); }
+  catch (err) { note("#cs-msg", err.message, "bad"); }
+  loadCases();
+}));
+$("#cs-detail").addEventListener("click", async e => {
+  const so = e.target.closest("[data-signoff]"), fb = e.target.closest("[data-fb]");
+  if (so) { pendingSignoff = { caseId: selCase, stage: so.dataset.signoff }; $("#so-case").textContent = selCase; $("#so-stage").textContent = stageLabel(so.dataset.signoff); $("#so-err").textContent = ""; $("#signoff").classList.remove("hidden"); $("#so-ok").focus(); }
+  if (fb) {
+    const c = cases.find(x => x.case_id === selCase);
+    try {
+      const r = await det("decision", { account_id: c.account_id, outcome: fb.dataset.fb, txn_id: c.case_id, analyst_note: `Analyst registered ${fb.dataset.fb} from case queue` });
+      const th = `${r.prior_threshold_hold?.toFixed(2)} → ${r.current_threshold_hold?.toFixed(2)}`;
+      note("#cs-msg", fb.dataset.fb === "FALSE_POSITIVE" ? `Marked false positive. Hold threshold ${th}.` : `Mule confirmed. Hold threshold tightened ${th}.`, "ok");
+    } catch (err) { note("#cs-msg", err.message, "bad"); }
+  }
+});
+$("#so-cancel").onclick = () => $("#signoff").classList.add("hidden");
+$("#so-ok").onclick = async () => {
+  try {
+    await det(`case/${encodeURIComponent(pendingSignoff.caseId)}/advance`, { target_stage: pendingSignoff.stage, human_approved: true, simulate_days: 0 });
+    $("#signoff").classList.add("hidden");
+    note("#cs-msg", `Human approval recorded. ${pendingSignoff.caseId} moved to ${stageLabel(pendingSignoff.stage)}.`, "ok");
+    loadCases();
+  } catch (err) { $("#so-err").textContent = err.message; }
+};
+
+let invoices = [], selInv = null, invFilter = "alert";
+async function loadInvoices() {
+  try { invoices = (await det("invoices")).invoices; } catch (err) { $("#sh-list").innerHTML = `<tr><td colspan="6" class="empty">${esc(err.message)}</td></tr>`; return; }
+  renderInvoices();
+  if (!selInv) { const a = invoices.find(i => i.is_attacked || i.flag_bank_detail_change) || invoices[0]; if (a) selectInvoice(a.invoice_id); }
+}
+const tampered = i => i.is_attacked === 1 || i.flag_bank_detail_change === 1 || i.account_id !== i.original_account_id && i.is_attacked;
+function renderInvoices() {
+  const rows = invoices.filter(i => invFilter === "all" || tampered(i));
+  $("#sh-list").innerHTML = rows.map(i => `<tr class="click ${i.invoice_id === selInv ? "sel" : ""}" data-invoice="${esc(i.invoice_id)}">
+    <td class="mono small">${esc(i.invoice_id)}</td><td class="small">${esc(i.vendor_name)}</td><td class="num">${inr(i.amount)}</td>
+    <td class="small hide-sm">${esc(i.due_date)}</td>
+    <td>${badge(i.status === "HELD_ALERT" ? "s-bad" : i.status === "PAID" ? "s-ok" : "s-neutral", i.status.replace(/_/g, " ").toLowerCase())}</td>
+    <td>${tampered(i) ? badge("r-high", "Tampered") : `<span class="small muted">Normal</span>`}</td></tr>`).join("") || `<tr><td colspan="6" class="empty">No invoices.</td></tr>`;
+}
+filterGroup("#sh-filters", f => { invFilter = f; renderInvoices(); });
+$("#sh-list").addEventListener("click", e => { const r = e.target.closest("[data-invoice]"); if (r) selectInvoice(r.dataset.invoice); });
+async function selectInvoice(id) {
+  selInv = id; renderInvoices();
+  const i = invoices.find(x => x.invoice_id === id);
+  $("#sh-detail").innerHTML = `<div class="muted">Verifying vendor route…</div>`;
+  let v;
+  try { v = await det("vendor-check", { vendor_id: i.vendor_id, vendor_name: i.vendor_name, destination_account: i.account_id, invoice_number: i.invoice_id, amount: i.amount }); }
+  catch (err) { $("#sh-detail").innerHTML = `<div class="note bad">${esc(err.message)}</div>`; return; }
+  const diverted = v.divergence_flag || i.account_id !== i.original_account_id;
+  $("#sh-detail").innerHTML = `<div class="row"><h3 style="margin:0">Vendor route verification</h3><span class="spacer"></span><span class="mono">${esc(i.invoice_id)}</span></div>
+    <div class="note ${diverted ? "bad" : "ok"}" style="margin:.8rem 0">${diverted
+      ? `<strong>Payout account doesn't match the verified vendor account.</strong><div class="small" style="margin-top:.3rem">${esc(i.attack_description || v.evidence?.[0] || "")}</div>`
+      : "Beneficiary matches the vendor's verified account. Clean route."}</div>
+    <dl class="kv"><dt>Vendor</dt><dd>${esc(i.vendor_name)}</dd>
+      <dt>Verified account</dt><dd class="mono" style="color:var(--low)">${esc(i.original_account_id)}</dd>
+      <dt>Proposed payout</dt><dd class="mono" style="color:${diverted ? "var(--high)" : "inherit"}">${esc(i.account_id)}</dd>
+      <dt>Amount</dt><dd>${inr(i.amount)}</dd><dt>Due</dt><dd>${esc(i.due_date)}</dd>
+      <dt>Risk level</dt><dd>${badge(["HIGH", "CRITICAL"].includes(v.risk_level) ? "r-high" : v.risk_level === "MEDIUM" ? "r-medium" : "r-low", v.risk_level)}</dd>
+      <dt>Recommended</dt><dd>${esc(v.recommended_action.replace(/_/g, " ").toLowerCase())}</dd>
+      <dt>Callback needed</dt><dd>${v.callback_verification_required ? "Yes" : "No"}</dd></dl>
+    ${v.evidence?.length ? `<div class="eyebrow" style="margin-top:.9rem">Evidence</div><ul class="reasons small">${v.evidence.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    <div class="row" style="margin-top:1rem">
+      <button class="btn primary" data-inv-act="hold">Place hold / lien</button>
+      <button class="btn" data-inv-act="release">Authorise release</button>
+      <a href="#" class="btn sm" data-inv="${esc(i.account_id)}">Investigate payout account</a>
+    </div>`;
+}
+$("#sh-detail").addEventListener("click", async e => {
+  const b = e.target.closest("[data-inv-act]"); if (!b) return;
+  const i = invoices.find(x => x.invoice_id === selInv);
+  try {
+    if (b.dataset.invAct === "hold") {
+      await reviewAction(i.account_id, "block", `Business Shield hold on ${i.invoice_id}`);
+      await det("decision", { account_id: i.account_id, outcome: "HELD", txn_id: i.invoice_id, analyst_note: "Hold placed on tampered vendor bank details" });
+      note("#sh-msg", `Lien requested on ${i.account_id} and the account is blocked at this bank. ${i.invoice_id} is frozen pending callback verification.`, "ok");
+    } else {
+      await det("decision", { account_id: i.account_id, outcome: "PROCEEDED", txn_id: i.invoice_id, analyst_note: "Compliance officer authorised vendor disbursement" });
+      note("#sh-msg", `Payout released for ${i.invoice_id}.`);
+    }
+  } catch (err) { note("#sh-msg", err.message, "bad"); }
+});
+
+let metrics = null;
+async function loadImpact() {
+  const [st, m] = await Promise.all([det("stats").catch(() => null), det("metrics").catch(() => null)]);
+  metrics = m;
+  if (st) $("#im-detector").innerHTML = [
+    ["Stolen funds prevented", inrShort(st.prevented_inr), `vs ${inrShort(st.rule_only_prevented_inr)} rule-only`],
+    ["Liability exposure avoided", inrShort(st.exposure_avoided_inr), "RBI customer-liability formula"],
+    ["Still at risk", inrShort(st.at_risk_inr), ""], ["Lost", inrShort(st.lost_inr), ""],
+    ["False-positive cost", inrShort(st.false_positive_cost_inr), ""],
+    ["Accounts on watch", st.active_watch_accounts, `${st.interactive_holds_count} lien holds`],
+    ["Hold threshold", score(st.current_threshold_hold), `Delay at ${score(st.current_threshold_delay)}`],
+  ].map(([k, v, d]) => `<div class="tile"><div class="k">${k}</div><div class="v">${esc(v)}</div>${d ? `<div class="d">${esc(d)}</div>` : ""}</div>`).join("");
+  renderBankImpact();
+  if (!m) { $("#im-chart").innerHTML = `<div class="empty">eval/metrics.json not found. Retrain the model to create it.</div>`; return; }
+  const ml = m.ml_model, rb = m.rule_baseline;
+  $("#im-sub").textContent = `Held-out test set: ${m.dataset_summary.test_samples} accounts, ${m.dataset_summary.test_mules} mules. Evaluated ${isoShort(m.evaluation_timestamp)}.`;
+  barChart([["PR-AUC", ml.pr_auc, rb.pr_auc], ["Precision", ml.precision, rb.precision], ["Recall", ml.recall, rb.recall], ["False-positive rate", ml.false_positive_rate, rb.false_positive_rate]]);
+  $("#im-table").innerHTML = `<thead><tr><th>Metric</th><th class="num">ML model</th><th class="num">Rule baseline</th></tr></thead><tbody>` +
+    [["PR-AUC", "pr_auc"], ["Precision", "precision"], ["Recall", "recall"], ["False-positive rate", "false_positive_rate"]].map(([k, f]) => `<tr><td>${k}</td><td class="num">${pct(ml[f])}</td><td class="num">${pct(rb[f])}</td></tr>`).join("") +
+    `<tr><td>Training samples</td><td class="num" colspan="2">${m.dataset_summary.train_samples}</td></tr></tbody>`;
+  const rt = m.robustness_holdout_test;
+  $("#im-robust").innerHTML = rt ? `<strong>Robustness holdout:</strong> ${esc(rt.chain_id)}: ${rt.detected_mules} of ${rt.total_mules} mules detected · ${esc(rt.status || "")}` : "";
+  const cm = x => `<div><b>${x.true_positives}</b><span>True positives (mules caught)</span></div><div><b style="color:var(--high)">${x.false_positives}</b><span>False positives (good users stopped)</span></div><div><b>${x.true_negatives}</b><span>True negatives (clean released)</span></div><div><b style="color:var(--med)">${x.false_negatives}</b><span>False negatives (mules missed)</span></div>`;
+  $("#im-cm-ml").innerHTML = cm(ml); $("#im-cm-rule").innerHTML = cm(rb);
+}
+function renderBankImpact() {
+  const st = bankStats; if (!st) return;
+  $("#im-bank").innerHTML = [["Payments scanned", st.total], ["Warnings shown", (st.high || 0) + (st.medium || 0)], ["Cancelled after warning", st.cancelled],
+    ["Blocked", st.blocked], ["Sent anyway", st.sent_anyway], ["Money protected", inrShort(st.saved)]]
+    .map(([k, v]) => `<div class="tile"><div class="k">${k}</div><div class="v">${esc(v ?? 0)}</div></div>`).join("");
+}
+function barChart(rows) {
+  const W = 520, H = 250, L = 40, R = 8, T = 22, B = 34, gw = (W - L - R) / rows.length, bw = Math.min(34, gw / 3), ih = H - T - B;
+  const y = v => T + ih * (1 - v);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="ML model versus rule baseline on four metrics">`;
+  [0, .25, .5, .75, 1].forEach(v => s += `<line class="gridline" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v * 100}%</text>`);
+  rows.forEach(([k, a, b], i) => {
+    const cx = L + gw * i + gw / 2, x1 = cx - bw - 1, x2 = cx + 1;
+    const bar = (x, v, cls) => { const h = Math.max(0, ih * v), top = y(v), r = Math.min(4, h); return `<path class="${cls}" d="M${x} ${T + ih} V${top + r} Q${x} ${top} ${x + r} ${top} H${x + bw - r} Q${x + bw} ${top} ${x + bw} ${top + r} V${T + ih} Z"/>`; };
+    s += bar(x1, a, "bar1") + bar(x2, b, "bar2");
+    s += `<text class="val" x="${x1 + bw / 2}" y="${y(a) - 5}" text-anchor="middle">${(a * 100).toFixed(a < .1 ? 1 : 0)}</text><text class="val" x="${x2 + bw / 2}" y="${y(b) - 5}" text-anchor="middle">${(b * 100).toFixed(b < .1 ? 1 : 0)}</text>`;
+    s += `<text class="axis" x="${cx}" y="${H - 12}" text-anchor="middle">${k}</text>`;
+    s += `<rect class="hit" x="${L + gw * i + 2}" y="${T}" width="${gw - 4}" height="${ih}" data-tip="<b>${k}</b><br>ML model: <b>${pct(a)}</b><br>Rule baseline: <b>${pct(b)}</b>"/>`;
+  });
+  $("#im-chart").innerHTML = s + "</svg>";
+}
+
+async function loadSettings() {
+  const s = (await api("/api/admin/state").catch(() => null))?.settings; if (!s) return;
+  $("#set-ms").value = s.medium_seconds; $("#set-hs").value = s.high_seconds; $("#set-mt").value = s.medium_threshold; $("#set-ht").value = s.high_threshold;
+}
+$("#set-form").addEventListener("submit", async e => {
+  e.preventDefault(); $("#set-err").textContent = "";
+  try {
+    await api("/api/admin/settings", { body: { medium_seconds: +$("#set-ms").value, high_seconds: +$("#set-hs").value, medium_threshold: +$("#set-mt").value, high_threshold: +$("#set-ht").value } });
+    toast("Settings saved"); loadSettings();
+  } catch (err) { $("#set-err").textContent = err.message; }
+});
+
+start();
+</script>
+</body>
+</html>

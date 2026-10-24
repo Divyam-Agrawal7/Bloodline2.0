@@ -1,0 +1,11 @@
+{
+  "name": "bloodline2.0",
+  "version": "2.0.0",
+  "description": "Bloodline 2.0 - Mule Network Detection and Tracing",
+  "scripts": {
+    "start": "bash ./start.sh",
+    "local": "bash ./start.sh",
+    "start:local": "bash ./start.sh",
+    "test": ".venv/bin/pytest -v tests/"
+  }
+}

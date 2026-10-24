@@ -1,0 +1,58 @@
+{
+  "evaluation_timestamp": "2026-10-24T05:52:07.686572+00:00",
+  "dataset_summary": {
+    "total_samples": 4840,
+    "train_samples": 3885,
+    "test_samples": 955,
+    "test_mules": 24
+  },
+  "ml_model": {
+    "name": "XGBoost Mule Classifier (Cost-Sensitive)",
+    "pr_auc": 1.0,
+    "precision": 0.338,
+    "recall": 1.0,
+    "false_positive_rate": 0.0505,
+    "true_positives": 24,
+    "false_positives": 47,
+    "true_negatives": 884,
+    "false_negatives": 0
+  },
+  "rule_baseline": {
+    "name": "Standard Rule-Only Banking Policy",
+    "pr_auc": 0.1709,
+    "precision": 0.2278,
+    "recall": 0.75,
+    "false_positive_rate": 0.0655,
+    "true_positives": 18,
+    "false_positives": 61,
+    "true_negatives": 870,
+    "false_negatives": 6
+  },
+  "robustness_holdout_test": {
+    "chain_id": "CHAIN-08 (Slow Hops Mule Style)",
+    "detected_mules": 14,
+    "total_mules": 14,
+    "robustness_score": 1.0,
+    "status": "PASSED"
+  },
+  "feature_importances": {
+    "account_age_days": 0.2672,
+    "senders_1h": 0.0017,
+    "senders_24h": 0.023,
+    "senders_7d": 0.0399,
+    "new_sender_ratio": 0.1504,
+    "pass_through_ratio": 0.0314,
+    "median_dwell_time_mins": 0.0158,
+    "balance_retention": 0.2594,
+    "round_amount_share": 0.0,
+    "structuring_signal": 0.0087,
+    "dormancy": 0.02,
+    "share_of_normal_spending": 0.0171,
+    "shared_device_count": 0.0346,
+    "shared_ip_count": 0.0189,
+    "shared_phone_count": 0.0597,
+    "hops_to_flagged": 0.0127,
+    "flagged_neighbour_share": 0.0397,
+    "loop_membership": 0.0
+  }
+}

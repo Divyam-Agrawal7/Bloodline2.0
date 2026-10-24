@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.venv/
+*.log
+bloodline_bank/bank.db
+.pytest_cache/
+node_modules/
+.DS_Store

@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bloodline 2.0 — Mule Network Detection & Tracing</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            crimson: { 500: '#e11d48', 600: '#be123c', 700: '#9f1239', 900: '#4c0519', 950: '#2b030d' },
+            slate: { 950: '#030712', 900: '#0b1120', 850: '#111b2f', 800: '#1e293b', 700: '#334155' },
+            emerald: { 500: '#10b981', 600: '#059669', 950: '#022c22' },
+            amber: { 500: '#f59e0b', 600: '#d97706', 950: '#451a03' },
+            indigo: { 500: '#6366f1', 600: '#4f46e5', 950: '#1e1b4b' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Cytoscape for Network Visualization -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b1120; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    #network-canvas {
+      width: 100%;
+      height: 520px;
+      background: radial-gradient(circle at center, #0f172a 0%, #030712 100%);
+      border-radius: 0.75rem;
+    }
+    .badge-glow {
+      box-shadow: 0 0 12px rgba(225, 29, 72, 0.35);
+    }
+    .pulse-live {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .7; transform: scale(1.08); }
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased overflow-hidden selection:bg-crimson-600 selection:text-white">
+
+  <!-- ========================================== -->
+  <!-- TOP HEADER WITH MODE TOGGLE -->
+  <!-- ========================================== -->
+  <header class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between shrink-0">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-crimson-600 via-rose-500 to-amber-500 flex items-center justify-center font-black text-xl shadow-lg shadow-crimson-900/40">
+        B
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <span class="font-bold text-lg tracking-tight text-white">Bloodline 2.0</span>
+          <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-crimson-950 border border-crimson-700/60 text-crimson-300 font-semibold tracking-wide">
+            Mule Network Detection & Tracing
+          </span>
+          <span class="flex items-center space-x-1.5 text-[10px] px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-800/80 text-emerald-300">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-live"></span>
+            <span>Live Decision Core</span>
+          </span>
+        </div>
+        <div class="text-xs text-slate-400 flex items-center space-x-2 mt-0.5">
+          <span>Prototype boundary: Single-bank synthetic data</span>
+          <span>•</span>
+          <span class="text-amber-400 font-medium">Advisory Decision-Support Only</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode Toggle & Quick Actions -->
+    <div class="flex items-center space-x-3">
+      <!-- Mode Toggle Switch -->
+      <div class="bg-slate-950 p-1 rounded-lg border border-slate-800 flex items-center space-x-1">
+        <button onclick="setAppMode('simple')" id="btn-mode-simple" class="px-3 py-1.5 rounded-md text-xs font-semibold flex items-center space-x-1.5 bg-crimson-600 text-white shadow transition">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+          <span>Easy Mode (Guided)</span>
+        </button>
+        <button onclick="setAppMode('expert')" id="btn-mode-expert" class="px-3 py-1.5 rounded-md text-xs font-semibold flex items-center space-x-1.5 text-slate-400 hover:text-slate-200 transition">
+          <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+          <span>Expert Analyst Console</span>
+        </button>
+      </div>
+
+      <!-- Quick Action: Printable SAR Modal -->
+      <button onclick="openSarModal()" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+        <i data-lucide="file-text" class="w-3.5 h-3.5 text-indigo-400"></i>
+        <span>Regulatory SAR Draft</span>
+      </button>
+
+      <!-- OpenAPI Docs -->
+      <a href="/docs" target="_blank" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+        <i data-lucide="book-open" class="w-3.5 h-3.5 text-amber-400"></i>
+        <span>API Docs</span>
+      </a>
+
+      <!-- Reset Environment -->
+      <button onclick="resetDemoData()" title="Reset synthetic demo to clean initial state" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700 transition">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================== -->
+  <!-- TOP STATS METRIC BAR -->
+  <!-- ========================================== -->
+  <section class="bg-slate-900/60 border-b border-slate-800/80 px-6 py-2.5 flex items-center justify-between text-xs shrink-0">
+    <div class="flex items-center space-x-6 text-slate-400">
+      <div>
+        <span class="text-slate-500">Prevented Fraud:</span>
+        <strong class="font-mono text-emerald-400 font-bold ml-1">$450,000.00</strong>
+      </div>
+      <div>
+        <span class="text-slate-500">Active Review/Cooling-Off:</span>
+        <strong class="font-mono text-amber-400 font-bold ml-1">$98,500.00</strong>
+      </div>
+      <div>
+        <span class="text-slate-500">Detection Speed:</span>
+        <strong class="font-mono text-indigo-300 font-bold ml-1">12 minutes</strong>
+        <span class="text-[10px] text-emerald-400 ml-1">(vs 18.4h baseline)</span>
+      </div>
+      <div>
+        <span class="text-slate-500">Model Precision:</span>
+        <strong class="font-mono text-white font-bold ml-1">92.4%</strong>
+        <span class="text-[10px] text-emerald-400 ml-1">(+38.3% over static rules)</span>
+      </div>
+    </div>
+    <div class="flex items-center space-x-2 text-[11px] text-slate-400 font-mono">
+      <span>Policy: <strong class="text-slate-300">synthetic-demo-v1</strong></span>
+      <span>•</span>
+      <span>Model: <strong class="text-slate-300">demo-2026-01</strong></span>
+    </div>
+  </section>
+
+  <!-- ========================================== -->
+  <!-- EXPERT MODE TAB NAVIGATION (Shown in Expert Mode) -->
+  <!-- ========================================== -->
+  <nav id="expert-nav-tabs" class="hidden bg-slate-900/90 border-b border-slate-800 px-6 flex items-center space-x-1 shrink-0 overflow-x-auto">
+    <button onclick="switchTab('tab-walkthrough')" id="btn-tab-walkthrough" class="tab-btn px-4 py-2 text-xs font-semibold text-crimson-400 border-b-2 border-crimson-500 flex items-center space-x-2">
+      <i data-lucide="compass" class="w-4 h-4"></i>
+      <span>Guided 7-Step Tour</span>
+    </button>
+    <button onclick="switchTab('tab-scoring')" id="btn-tab-scoring" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200 border-b-2 border-transparent flex items-center space-x-2">
+      <i data-lucide="shield-alert" class="w-4 h-4"></i>
+      <span>Payment Scoring API</span>
+    </button>
+    <button onclick="switchTab('tab-network')" id="btn-tab-network" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200 border-b-2 border-transparent flex items-center space-x-2">
+      <i data-lucide="share-2" class="w-4 h-4"></i>
+      <span>Multigraph View</span>
+    </button>
+    <button onclick="switchTab('tab-lineage')" id="btn-tab-lineage" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200 border-b-2 border-transparent flex items-center space-x-2">
+      <i data-lucide="git-branch" class="w-4 h-4"></i>
+      <span>Money DNA (Sankey)</span>
+    </button>
+    <button onclick="switchTab('tab-nexthop')" id="btn-tab-nexthop" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200 border-b-2 border-transparent flex items-center space-x-2">
+      <i data-lucide="radar" class="w-4 h-4"></i>
+      <span>Next-Hop Interception</span>
+    </button>
+    <button onclick="switchTab('tab-cases')" id="btn-tab-cases" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200 border-b-2 border-transparent flex items-center space-x-2">
+      <i data-lucide="clock" class="w-4 h-4"></i>
+      <span>Case Clock & Audit</span>
+    </button>
+    <button onclick="switchTab('tab-vendor')" id="btn-tab-vendor" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200 border-b-2 border-transparent flex items-center space-x-2">
+      <i data-lucide="building-2" class="w-4 h-4"></i>
+      <span>Business Shield (BEC)</span>
+    </button>
+    <button onclick="switchTab('tab-impact')" id="btn-tab-impact" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200 border-b-2 border-transparent flex items-center space-x-2">
+      <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+      <span>Benchmark vs Baseline</span>
+    </button>
+  </nav>
+
+  <!-- ========================================== -->
+  <!-- MAIN WORKSPACE -->
+  <!-- ========================================== -->
+  <main class="flex-1 overflow-y-auto p-6 bg-slate-950">
+
+    <!-- ========================================== -->
+    <!-- VIEW A: EASY MODE (ONE-CLICK SCENARIOS & STORYBOARD) -->
+    <!-- ========================================== -->
+    <div id="view-simple-mode" class="space-y-6 max-w-6xl mx-auto">
+
+      <!-- Hero Header -->
+      <div class="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 p-6 rounded-2xl border border-slate-800 shadow-2xl relative overflow-hidden">
+        <div class="relative z-10 space-y-2">
+          <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-crimson-950/90 border border-crimson-800 text-crimson-300 text-xs font-bold">
+            <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+            <span>Interactive Decision-Support Simulator</span>
+          </div>
+          <h1 class="text-2xl font-black text-white tracking-tight">
+            Stop Mule Laundering Before Money Leaves the Bank.
+          </h1>
+          <p class="text-sm text-slate-300 max-w-3xl leading-relaxed">
+            Choose a scenario below to watch Bloodline 2.0 analyze transfer velocity, trace fund dispersion across mule hops (**Money DNA**), predict destination accounts, and trigger automated cooling-off pauses.
+          </p>
+        </div>
+      </div>
+
+      <!-- 4 Quick-Launch Scenario Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+        <!-- Card 1: Mule Syndicate Alpha -->
+        <div onclick="launchScenario('mule_attack')" id="card-scen-mule" class="scenario-card p-5 rounded-xl bg-slate-900 hover:bg-slate-850 border-2 border-crimson-700/80 cursor-pointer shadow-lg transition-all transform hover:-translate-y-0.5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="w-8 h-8 rounded-lg bg-crimson-950 border border-crimson-700 flex items-center justify-center text-crimson-400 font-bold">
+              <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+            </span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-crimson-950 text-crimson-300 border border-crimson-800">
+              HIGH RISK
+            </span>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Mule Smurfing Attack</h3>
+            <p class="text-xs text-slate-400 mt-1">$75k stolen wire split into 3 rapid pass-through mules.</p>
+          </div>
+          <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-crimson-400 font-semibold">
+            <span>Simulate & Trace &rarr;</span>
+            <span class="font-mono text-slate-400">$75,000 USD</span>
+          </div>
+        </div>
+
+        <!-- Card 2: Business Shield BEC -->
+        <div onclick="launchScenario('vendor_bec')" id="card-scen-vendor" class="scenario-card p-5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-amber-700/80 cursor-pointer shadow-lg transition-all transform hover:-translate-y-0.5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="w-8 h-8 rounded-lg bg-amber-950 border border-amber-700 flex items-center justify-center text-amber-400 font-bold">
+              <i data-lucide="building-2" class="w-4 h-4"></i>
+            </span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">
+              SUPPLIER FRAUD
+            </span>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Vendor Invoice Tampering</h3>
+            <p class="text-xs text-slate-400 mt-1">Supplier bank account swapped 3h before $85k payout.</p>
+          </div>
+          <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-amber-400 font-semibold">
+            <span>Simulate Check &rarr;</span>
+            <span class="font-mono text-slate-400">$85,000 USD</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Circular Structuring Loop -->
+        <div onclick="launchScenario('structuring_loop')" id="card-scen-struct" class="scenario-card p-5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-indigo-700/80 cursor-pointer shadow-lg transition-all transform hover:-translate-y-0.5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="w-8 h-8 rounded-lg bg-indigo-950 border border-indigo-700 flex items-center justify-center text-indigo-400 font-bold">
+              <i data-lucide="repeat" class="w-4 h-4"></i>
+            </span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+              STRUCTURING
+            </span>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Circular Laundering Loop</h3>
+            <p class="text-xs text-slate-400 mt-1">Repetitive $9.5k transfers designed to bypass CTR limits.</p>
+          </div>
+          <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-indigo-400 font-semibold">
+            <span>Detect Cycle &rarr;</span>
+            <span class="font-mono text-slate-400">$9,500 USD</span>
+          </div>
+        </div>
+
+        <!-- Card 4: Normal Payroll (Clean) -->
+        <div onclick="launchScenario('legit_payroll')" id="card-scen-payroll" class="scenario-card p-5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-emerald-700/80 cursor-pointer shadow-lg transition-all transform hover:-translate-y-0.5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="w-8 h-8 rounded-lg bg-emerald-950 border border-emerald-700 flex items-center justify-center text-emerald-400 font-bold">
+              <i data-lucide="check-circle" class="w-4 h-4"></i>
+            </span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+              LOW RISK
+            </span>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Commercial Payroll</h3>
+            <p class="text-xs text-slate-400 mt-1">Normal $3,200 payroll salary passing through with 0 delay.</p>
+          </div>
+          <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-emerald-400 font-semibold">
+            <span>Verify Baseline &rarr;</span>
+            <span class="font-mono text-slate-400">$3,200 USD</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ========================================== -->
+      <!-- STORYBOARD INVESTIGATION WORKSPACE -->
+      <!-- ========================================== -->
+      <div id="simple-storyboard" class="space-y-6">
+        <!-- Rendered dynamically via launchScenario -->
+      </div>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- VIEW B: EXPERT ANALYST CONSOLE (Full Detailed Views) -->
+    <!-- ========================================== -->
+    <div id="view-expert-mode" class="hidden space-y-6">
+
+      <!-- ========================================== -->
+      <!-- TAB 1: GUIDED WALKTHROUGH (7 STEPS) -->
+      <!-- ========================================== -->
+      <div id="tab-walkthrough" class="tab-content space-y-6">
+        <div class="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl">
+          <div class="flex items-start justify-between">
+            <div>
+              <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+                <i data-lucide="compass" class="w-6 h-6 text-crimson-500"></i>
+                <span>Interactive Demo Walkthrough (7-Step Journey)</span>
+              </h2>
+              <p class="text-xs text-slate-400 mt-1 max-w-3xl">
+                Follow the official Bloodline 2.0 evaluation sequence. Each step triggers live API calls, evaluates decision policies, updates the graph multigraph, and walks through the entire detection lifecycle.
+              </p>
+            </div>
+            <span class="text-xs px-3 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700 font-mono">
+              Demo Version: 2026-v1
+            </span>
+          </div>
+
+          <!-- 7-Step Navigation Pipeline -->
+          <div class="grid grid-cols-7 gap-2 mt-6">
+            <button onclick="runWalkthroughStep(1)" id="wt-step-1" class="wt-btn p-3 rounded-lg bg-crimson-950/80 border border-crimson-600 text-left transition">
+              <span class="text-[10px] font-bold text-crimson-400 uppercase tracking-wider block">Step 1</span>
+              <span class="text-xs font-semibold text-white block mt-0.5">Synthetic Data</span>
+              <span class="text-[10px] text-slate-400 block mt-1">Legit vs Mule Chain</span>
+            </button>
+            <button onclick="runWalkthroughStep(2)" id="wt-step-2" class="wt-btn p-3 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-left transition">
+              <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Step 2</span>
+              <span class="text-xs font-semibold text-slate-300 block mt-0.5">Payment Check</span>
+              <span class="text-[10px] text-slate-400 block mt-1">Score & Reasons</span>
+            </button>
+            <button onclick="runWalkthroughStep(3)" id="wt-step-3" class="wt-btn p-3 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-left transition">
+              <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Step 3</span>
+              <span class="text-xs font-semibold text-slate-300 block mt-0.5">Cooling-Off</span>
+              <span class="text-[10px] text-slate-400 block mt-1">Delay & Outcome</span>
+            </button>
+            <button onclick="runWalkthroughStep(4)" id="wt-step-4" class="wt-btn p-3 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-left transition">
+              <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Step 4</span>
+              <span class="text-xs font-semibold text-slate-300 block mt-0.5">Money DNA</span>
+              <span class="text-[10px] text-slate-400 block mt-1">Replay & Lineage</span>
+            </button>
+            <button onclick="runWalkthroughStep(5)" id="wt-step-5" class="wt-btn p-3 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-left transition">
+              <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Step 5</span>
+              <span class="text-xs font-semibold text-slate-300 block mt-0.5">Next-Hop Rank</span>
+              <span class="text-[10px] text-slate-400 block mt-1">Candidate Prediction</span>
+            </button>
+            <button onclick="runWalkthroughStep(6)" id="wt-step-6" class="wt-btn p-3 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-left transition">
+              <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Step 6</span>
+              <span class="text-xs font-semibold text-slate-300 block mt-0.5">Case Clock</span>
+              <span class="text-[10px] text-slate-400 block mt-1">Approvals & Audit</span>
+            </button>
+            <button onclick="runWalkthroughStep(7)" id="wt-step-7" class="wt-btn p-3 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-left transition">
+              <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Step 7</span>
+              <span class="text-xs font-semibold text-slate-300 block mt-0.5">Impact Ledger</span>
+              <span class="text-[10px] text-slate-400 block mt-1">Rule Baseline vs AI</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="walkthrough-display-card" class="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- TAB 2: TRANSACTION RISK SCORING & PAYEE -->
+      <!-- ========================================== -->
+      <div id="tab-scoring" class="tab-content hidden space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl space-y-4">
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+              <i data-lucide="send" class="w-5 h-5 text-indigo-400"></i>
+              <span>Pre-Payment Scoring Simulator</span>
+            </h3>
+            <p class="text-xs text-slate-400">Score payment transfers in real-time before fund release.</p>
+
+            <div class="space-y-3 pt-2 text-xs">
+              <div>
+                <label class="block text-slate-400 font-medium mb-1">Preset Scenarios</label>
+                <select id="scoring-preset" onchange="loadScoringPreset()" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200">
+                  <option value="mule_hub">Suspicious: $75,000 to Pioneer Digital (Mule Hub 1)</option>
+                  <option value="legit_payroll">Legitimate: $3,200 Payroll to Retail Checking</option>
+                  <option value="structuring">Structuring: $9,500 Wire to Ring Node B</option>
+                  <option value="dormant">Dormant Account Reactivation: $45,000 Inflow</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-slate-400 font-medium mb-1">Transaction ID</label>
+                <input type="text" id="score-tx-id" value="TXN-SIM-75K" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono">
+              </div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-slate-400 font-medium mb-1">Sender Account</label>
+                  <input type="text" id="score-sender" value="ACC-VICTIM-01" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono">
+                </div>
+                <div>
+                  <label class="block text-slate-400 font-medium mb-1">Receiver Account</label>
+                  <input type="text" id="score-receiver" value="ACC-MULE-HUB1" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-slate-400 font-medium mb-1">Amount (USD)</label>
+                  <input type="number" id="score-amount" value="75000" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono">
+                </div>
+                <div>
+                  <label class="block text-slate-400 font-medium mb-1">Payment Channel</label>
+                  <select id="score-channel" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200">
+                    <option value="FAST_PAY">FAST_PAY (Instant)</option>
+                    <option value="WIRE">WIRE</option>
+                    <option value="ACH">ACH</option>
+                    <option value="MOBILE_APP">MOBILE_APP</option>
+                  </select>
+                </div>
+              </div>
+
+              <button onclick="executeScoring()" class="w-full py-2.5 mt-3 rounded-lg bg-crimson-600 hover:bg-crimson-500 text-white font-semibold flex items-center justify-center space-x-2 transition">
+                <i data-lucide="zap" class="w-4 h-4"></i>
+                <span>Score Transaction via POST /api/v1/score</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="lg:col-span-2 bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl flex flex-col justify-between">
+            <div id="scoring-result-placeholder">
+              <h3 class="text-base font-bold text-white mb-2">Decision Recommendation & Evidence</h3>
+              <p class="text-xs text-slate-400">Click "Score Transaction" or select a preset to view model & policy evaluation.</p>
+            </div>
+            <div id="scoring-result-content" class="hidden space-y-4"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- TAB 3: NETWORK GRAPH VIEW -->
+      <!-- ========================================== -->
+      <div id="tab-network" class="tab-content hidden space-y-6">
+        <div class="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                <i data-lucide="share-2" class="w-5 h-5 text-indigo-400"></i>
+                <span>Temporal Heterogeneous Multigraph</span>
+              </h3>
+              <p class="text-xs text-slate-400">Graph visualization of accounts, shared hardware/IPs, transfers, and next-hop predictions.</p>
+            </div>
+
+            <div class="flex items-center space-x-3 text-xs">
+              <div class="flex items-center space-x-1.5 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
+                <span class="text-slate-400">Center Account:</span>
+                <select id="graph-account-select" onchange="loadNetworkGraph()" class="bg-transparent text-slate-200 font-mono focus:outline-none">
+                  <option value="ACC-MULE-HUB1">ACC-MULE-HUB1 (Hub 1)</option>
+                  <option value="ACC-VICTIM-01">ACC-VICTIM-01 (Victim)</option>
+                  <option value="ACC-MULE-002">ACC-MULE-002 (Layering Mule)</option>
+                  <option value="ACC-RING-A">ACC-RING-A (Cycle Cluster)</option>
+                  <option value="ACC-LEGIT-CORP">ACC-LEGIT-CORP (Commercial)</option>
+                  <option value="ACC-DORMANT-01">ACC-DORMANT-01 (Dormant)</option>
+                </select>
+              </div>
+
+              <div class="flex items-center space-x-1.5 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
+                <span class="text-slate-400">Hop Depth:</span>
+                <select id="graph-hops-select" onchange="loadNetworkGraph()" class="bg-transparent text-slate-200 focus:outline-none">
+                  <option value="2" selected>2 Hops</option>
+                  <option value="1">1 Hop</option>
+                </select>
+              </div>
+
+              <button onclick="toggleNextHopOverlay()" id="btn-toggle-overlay" class="px-3 py-1.5 rounded-lg bg-amber-950 text-amber-300 border border-amber-700/60 font-medium transition">
+                Next-Hop Overlay: ON
+              </button>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-4 text-[11px] text-slate-400 bg-slate-950 px-4 py-2.5 rounded-lg border border-slate-800">
+            <span class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded-full bg-crimson-500 inline-block"></span><span>Mule Account</span></span>
+            <span class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span><span>Legitimate Account</span></span>
+            <span class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded-full bg-purple-500 inline-block"></span><span>Shared Device/IP</span></span>
+            <span class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span><span>Victim / Exit Node</span></span>
+            <span class="flex items-center space-x-1.5"><span class="w-6 h-0.5 bg-slate-400 inline-block"></span><span>Completed Transfer</span></span>
+            <span class="flex items-center space-x-1.5"><span class="w-6 h-0.5 border-t-2 border-dashed border-amber-400 inline-block"></span><span>Predicted Next-Hop (Dashed)</span></span>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            <div class="lg:col-span-3">
+              <div id="network-canvas"></div>
+            </div>
+            <div id="graph-inspector" class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs space-y-3">
+              <h4 class="font-bold text-slate-200 border-b border-slate-800 pb-2">Entity Inspector</h4>
+              <p class="text-slate-400">Click any account or device node in the graph to view its risk indicators and evidence.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- TAB 4: MONEY DNA (SANKEY & TIMELINE) -->
+      <!-- ========================================== -->
+      <div id="tab-lineage" class="tab-content hidden space-y-6">
+        <div class="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                <i data-lucide="git-branch" class="w-5 h-5 text-crimson-500"></i>
+                <span>Money DNA — Estimated Proportional Tracing</span>
+              </h3>
+              <p class="text-xs text-slate-400">Time-aware flow tracing showing splits, merges, and frozen exit paths.</p>
+            </div>
+
+            <div class="flex items-center space-x-3 text-xs">
+              <span class="px-2.5 py-1 bg-amber-950/60 border border-amber-800/60 text-amber-400 rounded">
+                Attribution Assumption, Not Legal Finding
+              </span>
+              <button onclick="loadMoneyDNA()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700">
+                Refresh DNA Flow
+              </button>
+            </div>
+          </div>
+
+          <div id="sankey-container" class="bg-slate-950 p-6 rounded-xl border border-slate-800 min-h-[380px] flex flex-col justify-between">
+            <div id="sankey-nodes-grid" class="grid grid-cols-4 gap-4 h-full"></div>
+            <div class="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+              <div><span class="font-semibold text-slate-300">Methodology:</span> Proportional allocation over 72h window.</div>
+              <div id="dna-summary-stats" class="space-x-4"></div>
+            </div>
+          </div>
+
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold text-slate-300 flex items-center space-x-2">
+                <i data-lucide="play" class="w-3.5 h-3.5 text-crimson-400"></i>
+                <span>Timeline Scrubber (Transfer Replay)</span>
+              </span>
+              <span id="scrubber-time-label" class="font-mono text-crimson-400 font-medium">Step 1 of 5</span>
+            </div>
+            <input type="range" id="timeline-slider" min="1" max="5" value="1" oninput="updateTimelineScrubber(this.value)" class="w-full accent-crimson-500 cursor-pointer">
+            <div id="scrubber-description" class="text-xs text-slate-400 italic pt-1">Loading timeline events...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- TAB 5: NEXT-HOP PREDICTION -->
+      <!-- ========================================== -->
+      <div id="tab-nexthop" class="tab-content hidden space-y-6">
+        <div class="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                <i data-lucide="radar" class="w-5 h-5 text-amber-500"></i>
+                <span>Candidate Next-Hop Accounts & Proactive Intervention</span>
+              </h3>
+              <p class="text-xs text-slate-400">Calibrated destination probability ranking before funds reach exit gateways.</p>
+            </div>
+            <div class="flex items-center space-x-2 text-xs">
+              <span class="text-slate-400">Source Account:</span>
+              <select id="nexthop-account-select" onchange="loadNextHopPredictions()" class="bg-slate-800 border border-slate-700 px-3 py-1.5 rounded text-slate-200 font-mono">
+                <option value="ACC-MULE-HUB1">ACC-MULE-HUB1</option>
+                <option value="ACC-MULE-002">ACC-MULE-002</option>
+                <option value="ACC-MULE-003">ACC-MULE-003</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="nexthop-candidates-list" class="space-y-3 pt-2"></div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- TAB 6: CASE CLOCK & WORKFLOW -->
+      <!-- ========================================== -->
+      <div id="tab-cases" class="tab-content hidden space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                <i data-lucide="folder" class="w-5 h-5 text-indigo-400"></i>
+                <span>Active Investigation Cases</span>
+              </h3>
+              <button onclick="createNewCaseModal()" class="text-xs px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium">
+                + New Case
+              </button>
+            </div>
+            <div id="cases-list-container" class="space-y-2.5 text-xs max-h-[500px] overflow-y-auto pr-1"></div>
+          </div>
+
+          <div class="lg:col-span-2 bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl space-y-5">
+            <div id="case-detail-container">
+              <h3 class="text-base font-bold text-white mb-2">Select a Case</h3>
+              <p class="text-xs text-slate-400">Click on any case on the left to inspect its configurable clock, regulatory draft, and audit history.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- TAB 7: BUSINESS SHIELD (VENDOR CHECK) -->
+      <!-- ========================================== -->
+      <div id="tab-vendor" class="tab-content hidden space-y-6">
+        <div class="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                <i data-lucide="building-2" class="w-5 h-5 text-emerald-400"></i>
+                <span>Business Shield — Vendor Payout & Invoice Verification</span>
+              </h3>
+              <p class="text-xs text-slate-400">Protects against Business Email Compromise (BEC) and unauthorized bank detail modifications.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 text-xs space-y-3">
+              <h4 class="font-bold text-slate-200">Simulate Vendor Invoice Payout</h4>
+              <div>
+                <label class="block text-slate-400 mb-1">Registered Corporate Vendor</label>
+                <select id="vendor-select" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-slate-200">
+                  <option value="VEND-CORP-404">VEND-CORP-404 (Apex Facilities & Cloud Supplies Ltd)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Proposed Destination Account</label>
+                <input type="text" id="vendor-dest-account" value="ACC-MULE-HUB1" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-slate-200 font-mono">
+                <span class="text-[10px] text-amber-400 mt-1 block">Note: Historical verified account is ACC-LEGIT-CORP</span>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-slate-400 mb-1">Invoice Amount ($)</label>
+                  <input type="number" id="vendor-amount" value="85000" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-slate-200 font-mono">
+                </div>
+                <div>
+                  <label class="block text-slate-400 mb-1">Invoice Number</label>
+                  <input type="text" id="vendor-invoice-no" value="INV-2026-891" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-slate-200 font-mono">
+                </div>
+              </div>
+
+              <button onclick="executeVendorCheck()" class="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center justify-center space-x-2 transition mt-2">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+                <span>Verify Vendor Payout via POST /api/v1/vendor-check</span>
+              </button>
+            </div>
+
+            <div id="vendor-result-box" class="bg-slate-950 p-5 rounded-xl border border-slate-800 text-xs flex flex-col justify-center items-center text-slate-500">
+              <i data-lucide="shield" class="w-12 h-12 mb-3 text-slate-700"></i>
+              <span>Submit vendor verification to inspect destination risk and bank change delta.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- TAB 8: IMPACT LEDGER & BASELINE -->
+      <!-- ========================================== -->
+      <div id="tab-impact" class="tab-content hidden space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4" id="impact-kpi-cards"></div>
+
+        <div class="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                <i data-lucide="award" class="w-5 h-5 text-amber-400"></i>
+                <span>Comparative Benchmark: Bloodline 2.0 vs Rule-Only Baseline</span>
+              </h3>
+              <p class="text-xs text-slate-400">Documented evaluation on synthetic held-out scenarios (PR-AUC, precision, latency, intervention accuracy).</p>
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded bg-slate-800 border border-slate-700 text-slate-300">
+              N=10,000 synthetic transfers
+            </span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="border-b border-slate-800 text-slate-400 bg-slate-950/60">
+                  <th class="py-3 px-4 font-semibold">Evaluation Metric</th>
+                  <th class="py-3 px-4 font-semibold">Category</th>
+                  <th class="py-3 px-4 font-semibold text-emerald-400">Bloodline 2.0 (Graph+AI)</th>
+                  <th class="py-3 px-4 font-semibold text-slate-400">Rule-Only Baseline</th>
+                  <th class="py-3 px-4 font-semibold text-amber-300">Operational Delta</th>
+                </tr>
+              </thead>
+              <tbody id="baseline-comparison-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                <i data-lucide="sliders" class="w-4 h-4 text-indigo-400"></i>
+                <span>Bounded & Observable Threshold Adjustment</span>
+              </h3>
+              <p class="text-xs text-slate-400">Adjust decision threshold within observable guardrails [0.50, 0.95] before considering model retraining.</p>
+            </div>
+            <span id="current-threshold-label" class="font-mono text-xs font-bold text-crimson-400 bg-crimson-950 px-2.5 py-1 rounded border border-crimson-800">
+              Auto-Freeze Threshold: 0.88
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            <div class="md:col-span-2 space-y-2">
+              <input type="range" id="threshold-slider" min="0.50" max="0.95" step="0.01" value="0.88" oninput="updateThresholdLabel(this.value)" class="w-full accent-crimson-500">
+              <div class="flex justify-between text-[11px] text-slate-500 font-mono">
+                <span>Min Bound: 0.50</span>
+                <span>Guardrail Range: [0.50 - 0.95]</span>
+                <span>Max Bound: 0.95</span>
+              </div>
+            </div>
+            <div>
+              <button onclick="submitThresholdChange()" class="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition">
+                Save Threshold with Audit Log
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- MODAL: REGULATORY SUSPICIOUS ACTIVITY REPORT (SAR) -->
+  <!-- ========================================== -->
+  <div id="sar-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="file-check" class="w-5 h-5 text-indigo-400"></i>
+          <h3 class="text-base font-bold text-white">Regulatory Draft: Suspicious Activity Report (SAR)</h3>
+        </div>
+        <button onclick="closeSarModal()" class="text-slate-400 hover:text-white p-1 rounded-md">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-3 font-mono text-xs text-slate-300">
+        <div class="flex justify-between text-slate-400 text-[11px]">
+          <span>FORM REFERENCE: SAR-FIN-2026-ALPHA-01</span>
+          <span>DATE: 2026-10-23</span>
+        </div>
+        <div class="border-t border-slate-800 pt-2 space-y-1">
+          <div><strong class="text-white">SUBJECT ENTITY:</strong> Pioneer Digital Trading (ACC-MULE-HUB1)</div>
+          <div><strong class="text-white">PRIMARY INCIDENT:</strong> Compromised Origin Wire TXN-ORIGIN-75K ($75,000.00 USD)</div>
+          <div><strong class="text-white">MULE ROLE:</strong> Inbound Aggregator & Rapid Dispersal Hub</div>
+        </div>
+
+        <div class="pt-2 border-t border-slate-800 space-y-1">
+          <strong class="text-white">FORENSIC GRAPH EVIDENCE:</strong>
+          <p class="text-slate-400 leading-relaxed font-sans text-xs">
+            Account ACC-MULE-HUB1 was opened 14 days ago. Upon receiving $75,000.00 from Estate Trust Client Alpha, it dispersed 98.4% of total funds within 32 minutes across three layering accounts (ACC-MULE-002, ACC-MULE-003, ACC-MULE-004). All four accounts overlap directly on hardware identifier DEV-SYN-901 and IP subnet 194.26.29.x.
+          </p>
+        </div>
+
+        <div class="pt-2 border-t border-slate-800 space-y-1">
+          <strong class="text-white">RECOMMENDED ORDER:</strong>
+          <div class="text-amber-400 font-bold">PROVISIONAL ASSET FREEZE PURSUANT TO SECTION 102</div>
+          <div class="text-slate-400 text-[11px] font-sans">
+            Advisory Notice: Automatically drafted by Bloodline Case Clock engine; requires compliance officer digital signature.
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-2">
+        <span class="text-xs text-emerald-400 flex items-center space-x-1.5">
+          <i data-lucide="shield-check" class="w-4 h-4"></i>
+          <span>Schema-Checked & Digitally Auditable</span>
+        </span>
+        <div class="flex space-x-2">
+          <button onclick="window.print()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-semibold">
+            Print Brief
+          </button>
+          <button onclick="closeSarModal()" class="px-4 py-1.5 bg-crimson-600 hover:bg-crimson-500 text-white rounded-lg text-xs font-bold">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load console controller script -->
+  <script src="/static/js/console.js"></script>
+</body>
+</html>
