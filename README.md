@@ -30,12 +30,24 @@ cd ..\bloodline_bank
 ..\bloodline2_project\.venv\Scripts\python.exe -m uvicorn app:app --port 8001
 ```
 
+## Deploy on Render (free)
+
+`render.yaml` defines two free web services, `bloodline-detector` and `bloodline-bank`.
+
+1. On [render.com](https://render.com), choose **New → Blueprint** and pick this repo.
+2. When it finishes, open `bloodline-bank`'s URL.
+3. The admin password is generated for you. Find it under **bloodline-bank → Environment → `ADMIN_PASSWORD`**.
+
+If Render gives the detector a different hostname than `bloodline-detector.onrender.com`, set the bank's `DETECTOR_URL` to the real one.
+
+Free services sleep after about 15 minutes idle. The first request after that takes up to a minute while they wake, and the first scans may show "couldn't check" until the detector is up. A restart resets the bank's accounts and activity.
+
 ## Logins
 
 | Role | Username | Password |
 |---|---|---|
 | Customer | any customer account ID, e.g. `ACC00001` | `demo123` |
-| Admin | `admin` | `admin123` |
+| Admin | `admin` | `admin123` locally; generated on Render |
 
 ## What's inside
 

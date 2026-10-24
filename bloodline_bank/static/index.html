@@ -722,6 +722,7 @@ async function renderDemo() {
   if (!demo) { try { demo = await api("/api/demo-logins"); } catch { return; } }
   const el = $("#demo-logins");
   if (loginRole === "admin") {
+    if (!demo.admin) { el.innerHTML = ""; return; }
     el.innerHTML = `Demo admin: <button data-u="${esc(demo.admin.username)}" data-p="${esc(demo.admin.password)}">${esc(demo.admin.username)} / ${esc(demo.admin.password)}</button>`;
   } else {
     el.innerHTML = `Demo customers (password <span class="mono">${esc(demo.user_password)}</span>): ` +

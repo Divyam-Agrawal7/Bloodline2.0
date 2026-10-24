@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: bloodline-detector
+    runtime: python
+    plan: free
+    rootDir: bloodline2_project
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+
+  - type: web
+    name: bloodline-bank
+    runtime: python
+    plan: free
+    rootDir: bloodline_bank
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: DETECTOR_URL
+        value: https://bloodline-detector.onrender.com
+      - key: ADMIN_PASSWORD
+        generateValue: true
