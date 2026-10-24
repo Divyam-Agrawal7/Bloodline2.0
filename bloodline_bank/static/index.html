@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bloodline Bank</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%22100%20340%20394%20425%22%3E%3Cpath%20d%3D%22M180%20348H413L484%20398V560C484%20662%20404%20722%20297%20758C190%20722%20110%20662%20110%20560V395Z%22%20fill%3D%22%23D1142F%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M182%20366H407L463%20406V575C463%20646%20392%20703%20297%20733%22%20fill%3D%22none%22%20stroke%3D%22%23FF4B5F%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%0A%20%20%3Cpath%20fill%3D%22%230B0B0E%22%20fill-rule%3D%22evenodd%22%20d%3D%22M176%20402H366L434%20460V512L402%20545L446%20578V632L386%20678H176Z%20M236%20460H293V480H348L371%20500L348%20520H236Z%20M236%20576H293V586H360L383%20604L360%20620H293V678H236Z%22%2F%3E%0A%20%20%3Cg%20stroke%3D%22%23FF4B5F%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22%20fill%3D%22%23FF4B5F%22%3E%0A%20%20%20%20%3Cline%20x1%3D%22150%22%20y1%3D%22477%22%20x2%3D%22200%22%20y2%3D%22477%22%2F%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%22477%22%20r%3D%229%22%20stroke%3D%22none%22%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%22150%22%20y1%3D%22603%22%20x2%3D%22200%22%20y2%3D%22603%22%2F%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%22603%22%20r%3D%229%22%20stroke%3D%22none%22%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%22416%22%20y1%3D%22497%22%20x2%3D%22453%22%20y2%3D%22497%22%2F%3E%3Ccircle%20cx%3D%22453%22%20cy%3D%22497%22%20r%3D%229%22%20stroke%3D%22none%22%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%22426%22%20y1%3D%22596%22%20x2%3D%22468%22%20y2%3D%22596%22%2F%3E%3Ccircle%20cx%3D%22468%22%20cy%3D%22596%22%20r%3D%229%22%20stroke%3D%22none%22%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%22248%22%20y1%3D%22552%22%20x2%3D%22302%22%20y2%3D%22552%22%2F%3E%3Ccircle%20cx%3D%22274%22%20cy%3D%22552%22%20r%3D%229%22%20stroke%3D%22none%22%2F%3E%0A%20%20%3C%2Fg%3E%3C%2Fsvg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
 <style>
 :root {
   color-scheme: dark;
@@ -78,7 +82,8 @@ tr.click { cursor: pointer; }
 .topbar { background: var(--header); color: var(--text); border-bottom: 1px solid var(--border); }
 .topbar .inner { max-width: 1320px; margin: 0 auto; padding: .8rem 16px; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .logo { display: flex; align-items: center; gap: .55rem; font-weight: 700; font-size: 1.1rem; letter-spacing: .01em; }
-.logo svg { width: 26px; height: 26px; color: var(--brand); }
+.logo svg.lockup { width: 148px; height: 46px; display: block; }
+.logo-sub { font-family: "Rajdhani", "Arial Narrow", sans-serif; font-weight: 700; font-size: 1.3rem; letter-spacing: .08em; color: var(--muted); padding-left: .6rem; border-left: 1px solid var(--border-strong); line-height: 1; }
 .topbar .who { font-size: .9rem; opacity: .92; }
 .topbar .btn { background: transparent; color: var(--text); border-color: var(--border-strong); }
 .topbar .btn:hover { background: var(--surface-2); }
@@ -95,7 +100,8 @@ main { max-width: 1320px; margin: 0 auto; padding: 1.2rem 16px 3rem; }
 
 #login-view { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--bg); }
 .login-box { width: 100%; max-width: 420px; }
-.login-box .logo { color: var(--text); justify-content: center; font-size: 1.5rem; margin-bottom: 1.2rem; }
+.login-box .logo { color: var(--text); justify-content: center; margin-bottom: 1.4rem; }
+.login-box .logo svg.lockup { width: 340px; height: 106px; max-width: 100%; }
 .seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--input); border-radius: 9px; padding: 3px; margin-bottom: 1rem; }
 .seg button { border: 0; background: none; padding: .5rem; border-radius: 7px; cursor: pointer; color: var(--muted); }
 .seg button.active { background: var(--brand); color: #fff; color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
@@ -225,7 +231,18 @@ main { max-width: 1320px; margin: 0 auto; padding: 1.2rem 16px 3rem; }
 <body>
 
 <svg width="0" height="0" style="position:absolute">
-  <symbol id="logo" viewBox="0 0 32 32"><path fill="currentColor" d="M16 2 4 7v8c0 7.2 5.1 13.4 12 15 6.9-1.6 12-7.8 12-15V7L16 2Zm0 6c2.8 3.6 5 6.6 5 9.2A5 5 0 0 1 16 22a5 5 0 0 1-5-4.8C11 14.6 13.2 11.6 16 8Z"/></symbol>
+  <symbol id="lockup" viewBox="100 340 1380 430"><path d="M180 348H413L484 398V560C484 662 404 722 297 758C190 722 110 662 110 560V395Z" fill="#D1142F"/>
+  <path d="M182 366H407L463 406V575C463 646 392 703 297 733" fill="none" stroke="#FF4B5F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path fill="#0B0B0E" fill-rule="evenodd" d="M176 402H366L434 460V512L402 545L446 578V632L386 678H176Z M236 460H293V480H348L371 500L348 520H236Z M236 576H293V586H360L383 604L360 620H293V678H236Z"/>
+  <g stroke="#FF4B5F" stroke-width="4" stroke-linecap="round" fill="#FF4B5F">
+    <line x1="150" y1="477" x2="200" y2="477"/><circle cx="150" cy="477" r="9" stroke="none"/>
+    <line x1="150" y1="603" x2="200" y2="603"/><circle cx="150" cy="603" r="9" stroke="none"/>
+    <line x1="416" y1="497" x2="453" y2="497"/><circle cx="453" cy="497" r="9" stroke="none"/>
+    <line x1="426" y1="596" x2="468" y2="596"/><circle cx="468" cy="596" r="9" stroke="none"/>
+    <line x1="248" y1="552" x2="302" y2="552"/><circle cx="274" cy="552" r="9" stroke="none"/>
+  </g>
+  <text x="565" y="586" textLength="630" lengthAdjust="spacingAndGlyphs" fill="#F3EEEE" font-family="'Rajdhani', 'Chakra Petch', 'Saira', 'Arial Narrow', sans-serif" font-weight="700" font-size="146">BLOODLINE</text>
+  <path d="M562 636H873L900 607L930 664L960 636H1466" fill="none" stroke="#D1142F" stroke-width="6" stroke-linejoin="miter"/></symbol>
   <symbol id="octagon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 7v6M12 16.5v.5"/></symbol>
   <marker id="arr-on" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 1 9 5 0 9z" style="fill:var(--flow)"/></marker>
   <marker id="arr-held" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 1 9 5 0 9z" style="fill:var(--held)"/></marker>
@@ -234,7 +251,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 1.2rem 16px 3rem; }
 
 <section id="login-view">
   <div class="login-box">
-    <div class="logo"><svg><use href="#logo"/></svg> Bloodline Bank</div>
+    <div class="logo"><svg class="lockup" viewBox="0 0 1380 430" role="img" aria-label="Bloodline"><use href="#lockup"/></svg></div>
     <div class="card">
       <div class="seg" role="tablist">
         <button class="active" data-role="user">Customer</button>
@@ -253,7 +270,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 1.2rem 16px 3rem; }
 
 <section id="user-view" class="hidden">
   <header class="topbar"><div class="inner">
-    <div class="logo"><svg><use href="#logo"/></svg> Bloodline Bank</div>
+    <div class="logo"><svg class="lockup" viewBox="0 0 1380 430" role="img" aria-label="Bloodline"><use href="#lockup"/></svg><span class="logo-sub">Bank</span></div>
     <span class="who" id="u-who"></span><span class="spacer"></span>
     <button class="btn sm" data-logout>Log out</button>
   </div></header>
@@ -328,7 +345,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 1.2rem 16px 3rem; }
 
 <section id="admin-view" class="hidden">
   <header class="topbar"><div class="inner">
-    <div class="logo"><svg><use href="#logo"/></svg> Bloodline Bank · Admin</div>
+    <div class="logo"><svg class="lockup" viewBox="0 0 1380 430" role="img" aria-label="Bloodline"><use href="#lockup"/></svg><span class="logo-sub">Admin</span></div>
     <span class="who" id="a-detector"></span><span class="spacer"></span>
     <button class="btn sm" data-logout>Log out</button>
   </div></header>

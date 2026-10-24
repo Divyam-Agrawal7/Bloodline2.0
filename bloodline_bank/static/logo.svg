@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="90 330 1400 450" width="1400" height="450" role="img" aria-labelledby="t">
+  <title id="t">Bloodline</title>
+  <defs>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@700&amp;display=swap');</style>
+  </defs>
+  <rect x="90" y="330" width="1400" height="450" fill="#0B0B0E"/>
+  <path d="M180 348H413L484 398V560C484 662 404 722 297 758C190 722 110 662 110 560V395Z" fill="#D1142F"/>
+  <path d="M182 366H407L463 406V575C463 646 392 703 297 733" fill="none" stroke="#FF4B5F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path fill="#0B0B0E" fill-rule="evenodd" d="M176 402H366L434 460V512L402 545L446 578V632L386 678H176Z M236 460H293V480H348L371 500L348 520H236Z M236 576H293V586H360L383 604L360 620H293V678H236Z"/>
+  <g stroke="#FF4B5F" stroke-width="4" stroke-linecap="round" fill="#FF4B5F">
+    <line x1="150" y1="477" x2="200" y2="477"/><circle cx="150" cy="477" r="9" stroke="none"/>
+    <line x1="150" y1="603" x2="200" y2="603"/><circle cx="150" cy="603" r="9" stroke="none"/>
+    <line x1="416" y1="497" x2="453" y2="497"/><circle cx="453" cy="497" r="9" stroke="none"/>
+    <line x1="426" y1="596" x2="468" y2="596"/><circle cx="468" cy="596" r="9" stroke="none"/>
+    <line x1="248" y1="552" x2="302" y2="552"/><circle cx="274" cy="552" r="9" stroke="none"/>
+  </g>
+  <text x="565" y="586" textLength="630" lengthAdjust="spacingAndGlyphs" fill="#F3EEEE" font-family="'Rajdhani', 'Chakra Petch', 'Saira', 'Arial Narrow', sans-serif" font-weight="700" font-size="146">BLOODLINE</text>
+  <path d="M562 636H873L900 607L930 664L960 636H1466" fill="none" stroke="#D1142F" stroke-width="6" stroke-linejoin="miter"/>
+</svg>

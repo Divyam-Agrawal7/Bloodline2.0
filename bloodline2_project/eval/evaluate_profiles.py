@@ -137,6 +137,16 @@ def test_profile_model(df, test_size, out_model):
     return res, errors
 
 
+def test_pretrained(df, path):
+    saved = joblib.load(path)
+    x = profile_matrix(df, saved["columns"])
+    missing = [c for c in saved["columns"] if c.split("_")[0] in ("bank", "city") and c not in profile_matrix(df).columns]
+    p = saved["model"].predict_proba(x)[:, 1]
+    res = summary(df["label"].values, p)
+    res["unseen_category_columns"] = len(missing)
+    return res
+
+
 def table(rows, cols):
     head = "| " + " | ".join(c for c, _ in cols) + " |\n|" + "---|" * len(cols) + "\n"
     return head + "".join("| " + " | ".join(f(r) for _, f in cols) + " |\n" for r in rows)
@@ -177,24 +187,35 @@ def main():
     ap.add_argument("--models", default=str(ROOT / "data" / "models"))
     ap.add_argument("--out", default=str(ROOT / "eval"))
     ap.add_argument("--test-size", type=float, default=0.3)
-    ap.add_argument("--save-model", default=str(ROOT / "data" / "models_profile" / "profile_model.joblib"))
+    ap.add_argument("--save-model", default=None)
+    ap.add_argument("--pretrained", default=None, help="Profile model trained on another dataset, scored on all of this one")
     args = ap.parse_args()
 
     df, as_of = load_accounts(args.dataset)
     a, _ = test_current_model(df, as_of, args.models)
+    c = test_pretrained(df, args.pretrained) if args.pretrained else None
     b, errors = test_profile_model(df, args.test_size, args.save_model)
     name = Path(args.dataset).name
     out = Path(args.out)
+    stem = Path(args.dataset).stem
     json.dump({"dataset": name, "as_of": as_of, "excluded_fields": LEAKY_FIELDS, "current_model_profile_only": a,
-               "profile_model": b}, open(out / "profile_report.json", "w", encoding="utf-8"), indent=2)
-    (out / "profile_report.md").write_text(report_md(name, a, b, errors), encoding="utf-8")
+               "pretrained_profile_model": c, "profile_model": b},
+              open(out / f"profile_report_{stem}.json", "w", encoding="utf-8"), indent=2)
+    md = report_md(name, a, b, errors)
+    if c:
+        md += f"\n## C. Profile model trained on another dataset, tested on all of {name}\n\n"
+        md += f"PR-AUC **{c['pr_auc']}**, ROC-AUC **{c['roc_auc']}**.\n\n" + "\n".join(
+            f"- {k} ({v['threshold']}): accuracy {v['accuracy']:.1%}, precision {v['precision']:.1%}, recall {v['recall']:.1%}, "
+            f"false-positive rate {v['false_positive_rate']:.1%}" for k, v in c["bands"].items()) + "\n"
+        print(f"C pretrained:     PR-AUC {c['pr_auc']}  ROC-AUC {c['roc_auc']}\n   @0.40 {c['bands']['medium']}\n   @0.70 {c['bands']['high']}")
+    (out / f"profile_report_{stem}.md").write_text(md, encoding="utf-8")
     print(f"A current model:  PR-AUC {a['pr_auc']}  ROC-AUC {a['roc_auc']}  @0.40 {a['bands']['medium']}  @0.70 {a['bands']['high']}")
     print(f"   signals with data: {a['signals_with_data']}  score spread: {a['score_spread']}")
     print(f"B profile model:  PR-AUC {b['pr_auc']}  ROC-AUC {b['roc_auc']}  CV {b['cv_pr_auc_mean']}±{b['cv_pr_auc_std']}")
     print(f"   @0.40 {b['bands']['medium']}\n   @0.70 {b['bands']['high']}")
     print(f"   top features: {b['top_features'][:5]}")
     print(f"   single-feature ROC-AUC: {b['single_feature_roc_auc']}")
-    print(f"Reports: {out / 'profile_report.md'}, {out / 'profile_report.json'}")
+    print(f"Reports: {out / ('profile_report_' + stem + '.md')}")
 
 
 if __name__ == "__main__":
