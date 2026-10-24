@@ -80,8 +80,8 @@ def serve_index(request: Request):
     index_file = FRONTEND_DIST / "index.html"
     if index_file.exists():
         return HTMLResponse(content=index_file.read_text(encoding="utf-8"), status_code=200)
-    return templates.TemplateResponse("console.html", {"request": request})
+    return templates.TemplateResponse(request, "console.html")
 
 @app.get("/legacy-console", response_class=HTMLResponse, tags=["Web App"])
 def serve_legacy_console(request: Request):
-    return templates.TemplateResponse("console.html", {"request": request})
+    return templates.TemplateResponse(request, "console.html")
