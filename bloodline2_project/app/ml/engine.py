@@ -53,9 +53,13 @@ class MLEngine:
             bundle = joblib.load(bundle_path)
             self.xgb_model = bundle["model"]
             self.thresh_base = bundle.get("thresh_base", 0.0035)
+            self.calibrator = bundle.get("calibrator")
+            self.as_of_epoch = bundle.get("as_of_epoch")
         else:
             self.xgb_model = joblib.load(MODEL_DIR / "xgboost_mule.joblib")
             self.thresh_base = 0.0035
+            self.calibrator = None
+            self.as_of_epoch = None
 
         self.iso_model = joblib.load(MODEL_DIR / "isolation_forest.joblib")
         self.shap_explainer = joblib.load(MODEL_DIR / "shap_explainer.joblib")
@@ -67,6 +71,8 @@ class MLEngine:
         return cls._instance
 
     def _calibrate_prob(self, raw_p: float) -> float:
+        if self.calibrator is not None:
+            return float(np.clip(self.calibrator.predict([raw_p])[0], 0.01, 0.99))
         ratio = raw_p / (self.thresh_base + 1e-12)
         score = 1.0 / (1.0 + np.exp(- 2.0 * np.log(ratio + 1e-12)))
         return float(np.clip(score, 0.01, 0.99))
@@ -84,7 +90,7 @@ class MLEngine:
         """
         if as_of_epoch is None:
             # Default to latest simulated epoch
-            as_of_epoch = 1792778400
+            as_of_epoch = self.as_of_epoch or 1792778400
 
         feats = self.feature_store.extract_point_in_time_features(account_id, as_of_epoch, amount)
         df_feat = pd.DataFrame([feats])[FEATURE_COLUMNS]

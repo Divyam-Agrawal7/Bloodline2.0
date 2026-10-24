@@ -133,7 +133,7 @@ def demo_logins():
     with db() as c:
         rows = c.execute("SELECT id, name FROM accounts WHERE role = 'NORMAL' ORDER BY id LIMIT 4").fetchall()
     return {"customers": [dict(r) for r in rows], "user_password": USER_PASSWORD,
-            "admin": None if "ADMIN_PASSWORD" in os.environ else {"username": ADMIN_USER, "password": ADMIN_PASSWORD}}
+            "admin": {"username": ADMIN_USER, "password": ADMIN_PASSWORD}}
 
 
 async def scan(from_id, to_id, amount):

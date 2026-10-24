@@ -1,271 +1,186 @@
-"""
-Model Training and Evaluation Pipeline for Bloodline 2.0 (Phase 2)
-Trains:
-  1. XGBoost Mule Classifier (with scale_pos_weight & PR-AUC early stopping)
-  2. IsolationForest Per-Account Baseline
-  3. Rule-Only Baseline for benchmark comparison
-Evaluates on chronological + chain-disjoint test split (including Chain 8 holdout).
-Generates TreeSHAP explainer and outputs eval/metrics.json.
-"""
-
-import os
+import argparse
+import itertools
 import json
+import random
 import sqlite3
+from pathlib import Path
+
 import joblib
 import numpy as np
 import pandas as pd
-from pathlib import Path
-from sklearn.ensemble import IsolationForest
-from sklearn.metrics import precision_recall_curve, auc, precision_score, recall_score, confusion_matrix
-import xgboost as xgb
 import shap
+import xgboost as xgb
+from sklearn.ensemble import IsolationForest
+from sklearn.isotonic import IsotonicRegression
+from sklearn.metrics import average_precision_score, confusion_matrix, precision_score, recall_score
+from sklearn.model_selection import StratifiedGroupKFold
 
 from app.ml.features import FeatureStore, FEATURE_COLUMNS
 
-MODEL_DIR = Path("data/models")
-EVAL_DIR = Path("eval")
+SAMPLES_PER_ACCOUNT = 3
+FOLDS = 5
+ISO_COLUMNS = ["pass_through_ratio", "median_dwell_time_mins", "structuring_signal", "shared_device_count"]
+PARAM_GRID = {
+    "max_depth": [2, 3, 4],
+    "learning_rate": [0.05, 0.1],
+    "n_estimators": [150, 300],
+    "min_child_weight": [1, 5],
+}
 
-def extract_training_dataset(db_path: str = "data/bloodline.db"):
-    """
-    Extracts point-in-time training instances from the database.
-    Samples mule transactions and legitimate look-alikes.
-    """
+
+def extract_training_dataset(db_path):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
+    cur = conn.cursor()
     fs = FeatureStore(db_path)
-
-    # Fetch accounts: all mules, all look-alikes, and a sample of regular accounts
-    cursor.execute("""
-        SELECT id, is_mule, role, chain_id FROM accounts
-        WHERE is_mule = 1 OR role != 'LEGIT_RETAIL'
-    """)
-    special = cursor.fetchall()
-
-    cursor.execute("""
-        SELECT id, is_mule, role, chain_id FROM accounts
-        WHERE role = 'LEGIT_RETAIL'
-        LIMIT 600
-    """)
-    regular = cursor.fetchall()
-    accounts = special + regular
-
+    latest = cur.execute("SELECT MAX(epoch_seconds) FROM transactions").fetchone()[0] or 0
+    accounts = cur.execute("SELECT id, is_mule, role, chain_id FROM accounts WHERE role != 'HONEYPOT'").fetchall()
+    rng = random.Random(42)
     records = []
     print(f"Extracting point-in-time features for {len(accounts)} accounts...")
-
     for acc in accounts:
-        acc_id = acc["id"]
-        is_mule = int(acc["is_mule"])
-        role = acc["role"]
-        chain_id = acc["chain_id"]
-
-        if role == "HONEYPOT":
-            continue
-
-        # Get relevant transaction timestamps for this account
-        cursor.execute("""
-            SELECT epoch_seconds, amount FROM transactions 
-            WHERE receiver = ? OR sender = ? 
-            ORDER BY epoch_seconds DESC LIMIT 2
-        """, (acc_id, acc_id))
-        txns = cursor.fetchall()
-
-        if txns:
-            for txn in txns:
-                eval_epoch = txn["epoch_seconds"] + 30
-                amt = txn["amount"]
-                feats = fs.extract_point_in_time_features(acc_id, eval_epoch, amt, conn=conn)
-                feats["account_id"] = acc_id
-                feats["is_mule"] = is_mule
-                feats["chain_id"] = chain_id or "LEGIT"
-                records.append(feats)
-        else:
-            eval_epoch = 1792778400
-            amt = 5000.0
-            feats = fs.extract_point_in_time_features(acc_id, eval_epoch, amt, conn=conn)
-            feats["account_id"] = acc_id
-            feats["is_mule"] = is_mule
-            feats["chain_id"] = chain_id or "LEGIT"
+        rows = cur.execute("""SELECT epoch_seconds, amount FROM transactions WHERE receiver = ? OR sender = ?
+                              ORDER BY epoch_seconds""", (acc["id"], acc["id"])).fetchall()
+        points = rng.sample(rows, min(SAMPLES_PER_ACCOUNT, len(rows))) if rows else [None]
+        for t in points:
+            epoch, amt = (t["epoch_seconds"] + 30, t["amount"]) if t else (latest + 60, 5000.0)
+            feats = fs.extract_point_in_time_features(acc["id"], epoch, amt, conn=conn)
+            feats.update(account_id=acc["id"], is_mule=int(acc["is_mule"]),
+                         chain_id=acc["chain_id"] if acc["is_mule"] and acc["chain_id"] else "LEGIT")
             records.append(feats)
-
     conn.close()
     df = pd.DataFrame(records)
-    print(f"Dataset shape: {df.shape}, Mule count: {df['is_mule'].sum()}")
-    return df
+    df["group"] = np.where(df["chain_id"] == "LEGIT", df["account_id"], df["chain_id"])
+    print(f"Dataset: {len(df)} samples from {df['account_id'].nunique()} accounts, "
+          f"{df.loc[df.is_mule == 1, 'account_id'].nunique()} mule accounts in {df.loc[df.is_mule == 1, 'chain_id'].nunique()} rings")
+    return df, latest
 
-def rule_only_predict(df: pd.DataFrame) -> np.ndarray:
-    """
-    Traditional rule-only banking benchmark:
-    Flags if (age < 45 and pass-through > 0.80 and dwell < 30m) OR (structuring >= 2) OR (shared devices >= 1).
-    """
+
+def rule_only_predict(df):
     cond1 = (df["account_age_days"] < 45) & (df["pass_through_ratio"] > 0.80) & (df["median_dwell_time_mins"] < 30)
     cond2 = df["structuring_signal"] >= 2
     cond3 = df["shared_device_count"] >= 1
-    flags = (cond1 | cond2 | cond3).astype(int)
-    return flags.values
+    return (cond1 | cond2 | cond3).astype(int).values
 
-def train_and_evaluate():
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    EVAL_DIR.mkdir(parents=True, exist_ok=True)
 
-    df = extract_training_dataset()
+def make_model(params, y):
+    weight = float((y == 0).sum() / max(1, (y == 1).sum()))
+    return xgb.XGBClassifier(subsample=0.8, colsample_bytree=0.8, scale_pos_weight=weight,
+                             eval_metric="aucpr", random_state=42, **params)
 
-    # Chain-Disjoint Split:
-    # Chains 7 and 8 (Chain 8 is holdout slower hops) are in Test set!
-    unique_chains = [c for c in df["chain_id"].dropna().unique() if c != "LEGIT" and c != ""]
-    test_chains = [c for c in unique_chains if any(k in str(c) for k in ["07", "08", "CH07", "CH08", "CHAIN-07", "CHAIN-08"])]
-    if not test_chains:
-        test_chains = unique_chains[-2:] if len(unique_chains) >= 2 else unique_chains
-    
-    # Split legitimate accounts randomly with fixed seed (80/20)
-    legit_mask = df["chain_id"] == "LEGIT"
-    np.random.seed(42)
-    legit_test_idx = np.random.choice(df[legit_mask].index, size=int(0.20 * legit_mask.sum()), replace=False)
 
-    test_mask = df["chain_id"].isin(test_chains)
-    test_indices = df[test_mask].index.union(legit_test_idx)
-    train_indices = df.index.difference(test_indices)
+def out_of_fold(df, params, folds):
+    x, y = df[FEATURE_COLUMNS], df["is_mule"].values
+    oof = np.zeros(len(df))
+    for tr, te in folds:
+        oof[te] = make_model(params, y[tr]).fit(x.iloc[tr], y[tr]).predict_proba(x.iloc[te])[:, 1]
+    return oof
 
-    train_df = df.loc[train_indices].copy()
-    test_df = df.loc[test_indices].copy()
 
-    X_train = train_df[FEATURE_COLUMNS]
-    y_train = train_df["is_mule"]
-    X_test = test_df[FEATURE_COLUMNS]
-    y_test = test_df["is_mule"]
+def confusion(y, pred):
+    tn, fp, fn, tp = confusion_matrix(y, pred, labels=[0, 1]).ravel()
+    return {"precision": round(float(precision_score(y, pred, zero_division=0)), 4),
+            "recall": round(float(recall_score(y, pred, zero_division=0)), 4),
+            "false_positive_rate": round(float(fp / max(1, fp + tn)), 4),
+            "true_positives": int(tp), "false_positives": int(fp), "true_negatives": int(tn), "false_negatives": int(fn)}
 
-    print(f"Train set: {len(X_train)} samples ({y_train.sum()} mules)")
-    print(f"Test set: {len(X_test)} samples ({y_test.sum()} mules, includes Chain 8 holdout)")
 
-    # 1. IsolationForest (Unsupervised deviance baseline feature)
-    iso = IsolationForest(n_estimators=100, contamination=0.015, random_state=42)
-    iso.fit(X_train[["pass_through_ratio", "median_dwell_time_mins", "structuring_signal", "shared_device_count"]])
-    joblib.dump(iso, MODEL_DIR / "isolation_forest.joblib")
+def pick_thresholds(y, p):
+    sweep = []
+    for t in np.round(np.arange(0.05, 1.0, 0.05), 2):
+        m = confusion(y, (p >= t).astype(int))
+        sweep.append({"threshold": float(t), **{k: m[k] for k in ("precision", "recall", "false_positive_rate")}})
+    high = next((s["threshold"] for s in sweep if s["precision"] >= 0.97 and s["recall"] >= 0.80), 0.70)
+    medium = max((s["threshold"] for s in sweep if s["recall"] >= 0.95 and s["threshold"] < high), default=min(0.40, high))
+    return {"medium": medium, "high": high}, sweep
 
-    # 2. XGBoost Mule Model
-    neg_count = (y_train == 0).sum()
-    pos_count = max(1, (y_train == 1).sum())
-    scale_weight = float(neg_count / pos_count)
 
-    xgb_model = xgb.XGBClassifier(
-        n_estimators=120,
-        max_depth=4,
-        learning_rate=0.08,
-        colsample_bytree=0.7,
-        subsample=0.8,
-        min_child_weight=2,
-        scale_pos_weight=scale_weight,
-        eval_metric="aucpr",
-        random_state=42
-    )
+def train_and_evaluate(db_path="data/bloodline.db", model_dir="data/models", eval_dir="eval"):
+    model_dir, eval_dir = Path(model_dir), Path(eval_dir)
+    model_dir.mkdir(parents=True, exist_ok=True)
+    eval_dir.mkdir(parents=True, exist_ok=True)
 
-    xgb_model.fit(
-        X_train, y_train,
-        eval_set=[(X_test, y_test)],
-        verbose=False
-    )
-    # 3. SHAP TreeExplainer
-    explainer = shap.TreeExplainer(xgb_model)
-    joblib.dump(explainer, MODEL_DIR / "shap_explainer.joblib")
+    df, latest = extract_training_dataset(db_path)
+    x, y = df[FEATURE_COLUMNS], df["is_mule"].values
+    folds = list(StratifiedGroupKFold(n_splits=FOLDS, shuffle=True, random_state=42).split(x, y, df["group"]))
 
-    # 4. Evaluation Metrics
-    # Calibrate to standard bank risk score [0.0, 1.0] centered at operating threshold
-    thresh_base = 0.0035
-    joblib.dump({"model": xgb_model, "thresh_base": thresh_base}, MODEL_DIR / "xgboost_mule_bundle.joblib")
+    results = []
+    for values in itertools.product(*PARAM_GRID.values()):
+        params = dict(zip(PARAM_GRID.keys(), values))
+        score = average_precision_score(y, out_of_fold(df, params, folds))
+        results.append((score, params))
+        print(f"  {params} -> out-of-fold PR-AUC {score:.4f}")
+    best_score, best_params = max(results, key=lambda r: r[0])
+    print(f"Best settings: {best_params} (PR-AUC {best_score:.4f})")
 
-    # Raw test probabilities
-    y_raw_prob = xgb_model.predict_proba(X_test)[:, 1]
+    oof_raw = out_of_fold(df, best_params, folds)
+    calibrator = IsotonicRegression(out_of_bounds="clip", y_min=0.01, y_max=0.99).fit(oof_raw, y)
+    oof_cal = np.zeros(len(df))
+    for tr, te in folds:
+        fold_cal = IsotonicRegression(out_of_bounds="clip", y_min=0.01, y_max=0.99).fit(oof_raw[tr], y[tr])
+        oof_cal[te] = fold_cal.predict(oof_raw[te])
 
-    def calibrate_scores(raw_p, base=thresh_base):
-        ratio = raw_p / (base + 1e-12)
-        return 1.0 / (1.0 + np.exp(- 2.0 * np.log(ratio + 1e-12)))
+    thresholds, sweep = pick_thresholds(y, oof_cal)
+    ml = {"name": "XGBoost Mule Classifier (ring-held-out CV, isotonic calibration)",
+          "pr_auc": round(float(average_precision_score(y, oof_cal)), 4),
+          "operating_threshold": thresholds["high"], **confusion(y, (oof_cal >= thresholds["high"]).astype(int))}
+    rule_pred = rule_only_predict(df)
+    rule = {"name": "Standard Rule-Only Banking Policy",
+            "pr_auc": round(float(average_precision_score(y, rule_pred)), 4), **confusion(y, rule_pred)}
 
-    y_prob_ml = calibrate_scores(y_raw_prob)
-    operating_threshold = 0.50
-    y_pred_ml = (y_prob_ml >= operating_threshold).astype(int)
+    per_ring = {}
+    for chain in sorted(df.loc[df.is_mule == 1, "chain_id"].unique()):
+        mask = (df["chain_id"] == chain).values
+        per_ring[chain] = round(float((oof_cal[mask] >= thresholds["medium"]).mean()), 3)
+    c8 = df["chain_id"].astype(str).str.contains("08").values
+    c8_detected, c8_total = int((oof_cal[c8] >= thresholds["medium"]).sum()), int(c8.sum())
 
-    precision_curve, recall_curve, _ = precision_recall_curve(y_test, y_prob_ml)
-    pr_auc_ml = float(auc(recall_curve, precision_curve))
-    prec_ml = float(precision_score(y_test, y_pred_ml, zero_division=0))
-    rec_ml = float(recall_score(y_test, y_pred_ml, zero_division=0))
+    final = make_model(best_params, y).fit(x, y)
+    iso = IsolationForest(n_estimators=100, contamination=0.015, random_state=42).fit(x[ISO_COLUMNS])
+    joblib.dump(iso, model_dir / "isolation_forest.joblib")
+    joblib.dump(shap.TreeExplainer(final), model_dir / "shap_explainer.joblib")
+    joblib.dump({"model": final, "thresh_base": 0.0035, "calibrator": calibrator, "as_of_epoch": int(latest) + 60,
+                 "recommended_thresholds": thresholds, "params": best_params},
+                model_dir / "xgboost_mule_bundle.joblib")
 
-    tn_ml, fp_ml, fn_ml, tp_ml = confusion_matrix(y_test, y_pred_ml).ravel()
-    fpr_ml = float(fp_ml / (fp_ml + tn_ml)) if (fp_ml + tn_ml) > 0 else 0.0
-
-    # Rule-Only Baseline Predictions
-    y_pred_rule = rule_only_predict(test_df)
-    prec_rule = float(precision_score(y_test, y_pred_rule, zero_division=0))
-    rec_rule = float(recall_score(y_test, y_pred_rule, zero_division=0))
-    tn_r, fp_r, fn_r, tp_r = confusion_matrix(y_test, y_pred_rule).ravel()
-    fpr_rule = float(fp_r / (fp_r + tn_r)) if (fp_r + tn_r) > 0 else 0.0
-    pr_auc_rule = float(prec_rule * rec_rule) # Approx PR area for binary rule
-
-    # Chain 8 Robustness Sub-Test (Slower hops out-of-distribution)
-    c8_mask = test_df["chain_id"].astype(str).str.contains("08|CH08|CHAIN-08", na=False)
-    if c8_mask.sum() > 0:
-        c8_raw = xgb_model.predict_proba(test_df.loc[c8_mask, FEATURE_COLUMNS])[:, 1]
-        c8_scores = calibrate_scores(c8_raw)
-        c8_detected = int((c8_scores >= 0.40).sum())
-        c8_total = int(c8_mask.sum())
-    else:
-        c8_detected, c8_total = 18, 18
-
+    mule_samples = int(y.sum())
     metrics = {
         "evaluation_timestamp": pd.Timestamp.now(tz="UTC").isoformat(),
-        "dataset_summary": {
-            "total_samples": int(len(df)),
-            "train_samples": int(len(train_df)),
-            "test_samples": int(len(test_df)),
-            "test_mules": int(y_test.sum())
-        },
-        "ml_model": {
-            "name": "XGBoost Mule Classifier (Cost-Sensitive)",
-            "pr_auc": round(pr_auc_ml, 4),
-            "precision": round(prec_ml, 4),
-            "recall": round(rec_ml, 4),
-            "false_positive_rate": round(fpr_ml, 4),
-            "true_positives": int(tp_ml),
-            "false_positives": int(fp_ml),
-            "true_negatives": int(tn_ml),
-            "false_negatives": int(fn_ml)
-        },
-        "rule_baseline": {
-            "name": "Standard Rule-Only Banking Policy",
-            "pr_auc": round(pr_auc_rule, 4),
-            "precision": round(prec_rule, 4),
-            "recall": round(rec_rule, 4),
-            "false_positive_rate": round(fpr_rule, 4),
-            "true_positives": int(tp_r),
-            "false_positives": int(fp_r),
-            "true_negatives": int(tn_r),
-            "false_negatives": int(fn_r)
-        },
-        "robustness_holdout_test": {
-            "chain_id": "CHAIN-08 (Slow Hops Mule Style)",
-            "detected_mules": c8_detected,
-            "total_mules": c8_total,
-            "robustness_score": round(c8_detected / max(1, c8_total), 3),
-            "status": "PASSED" if (c8_detected / max(1, c8_total)) >= 0.70 else "FAILED"
-        },
-        "feature_importances": {
-            col: round(float(imp), 4)
-            for col, imp in zip(FEATURE_COLUMNS, xgb_model.feature_importances_)
-        }
+        "method": f"{FOLDS}-fold cross-validation with whole mule rings held out; every score is out-of-fold",
+        "dataset_summary": {"total_samples": int(len(df)), "train_samples": int(len(df) * (FOLDS - 1) / FOLDS),
+                            "test_samples": int(len(df)), "test_mules": mule_samples,
+                            "accounts": int(df["account_id"].nunique()),
+                            "mule_accounts": int(df.loc[df.is_mule == 1, "account_id"].nunique())},
+        "ml_model": ml,
+        "rule_baseline": rule,
+        "recommended_thresholds": thresholds,
+        "threshold_sweep": sweep,
+        "per_ring_recall_at_medium": per_ring,
+        "cross_validation": {"best_params": best_params, "best_pr_auc_raw": round(float(best_score), 4),
+                             "grid": [{"pr_auc": round(float(s), 4), **p} for s, p in sorted(results, key=lambda r: -r[0])]},
+        "robustness_holdout_test": {"chain_id": "CH08 (Slow Hops Mule Style)", "detected_mules": c8_detected,
+                                    "total_mules": c8_total,
+                                    "robustness_score": round(c8_detected / max(1, c8_total), 3),
+                                    "status": "PASSED" if c8_detected / max(1, c8_total) >= 0.70 else "FAILED"},
+        "feature_importances": {c: round(float(v), 4) for c, v in zip(FEATURE_COLUMNS, final.feature_importances_)},
     }
-
-    metrics_path = EVAL_DIR / "metrics.json"
-    with open(metrics_path, "w") as f:
-        json.dump(metrics, f, indent=2)
+    json.dump(metrics, open(eval_dir / "metrics.json", "w"), indent=2)
 
     print("=" * 60)
-    print("EVALUATION COMPLETE - RESULTS WRITTEN TO eval/metrics.json")
-    print(f"ML Model:      PR-AUC={pr_auc_ml:.4f}, Precision={prec_ml:.4f}, Recall={rec_ml:.4f}, FPR={fpr_ml:.4f}")
-    print(f"Rule Baseline: PR-AUC={pr_auc_rule:.4f}, Precision={prec_rule:.4f}, Recall={rec_rule:.4f}, FPR={fpr_rule:.4f}")
-    print(f"Chain 8 Robustness: {c8_detected}/{c8_total} detected ({metrics['robustness_holdout_test']['status']})")
+    print(f"ML model (out-of-fold): PR-AUC={ml['pr_auc']}, precision={ml['precision']}, recall={ml['recall']}, "
+          f"FPR={ml['false_positive_rate']} at threshold {thresholds['high']}")
+    print(f"Rule baseline:          PR-AUC={rule['pr_auc']}, precision={rule['precision']}, recall={rule['recall']}, "
+          f"FPR={rule['false_positive_rate']}")
+    print(f"Recommended thresholds: {thresholds}")
+    print(f"Chain 8 robustness: {c8_detected}/{c8_total} ({metrics['robustness_holdout_test']['status']})")
     print("=" * 60)
-
     return metrics
 
+
 if __name__ == "__main__":
-    train_and_evaluate()
+    ap = argparse.ArgumentParser(description="Train and evaluate the Bloodline mule model")
+    ap.add_argument("--db", default="data/bloodline.db")
+    ap.add_argument("--models", default="data/models")
+    ap.add_argument("--eval", default="eval")
+    a = ap.parse_args()
+    train_and_evaluate(a.db, a.models, a.eval)

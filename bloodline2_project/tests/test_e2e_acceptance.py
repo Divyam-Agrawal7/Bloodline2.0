@@ -38,7 +38,7 @@ def test_mule_scan_with_shap_and_counterfactual(client):
     assert r_scan.status_code == 200
     scan_data = r_scan.json()
     assert scan_data["verdict"] in ["HOLD", "DELAY"]
-    assert scan_data["probability"] >= 0.70
+    assert scan_data["probability"] >= scan_data["threshold_delay"]
     assert len(scan_data["top_reasons"]) > 0
     assert "counterfactual" in scan_data and len(scan_data["counterfactual"]) > 0
     assert len(scan_data["next_hops"]) > 0

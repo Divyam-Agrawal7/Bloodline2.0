@@ -279,7 +279,8 @@ class FeatureStore:
         if account_id in G:
             neighbours = list(G.predecessors(account_id)) + list(G.successors(account_id))
             if neighbours:
-                flagged_count = sum(1 for n in neighbours if n in honeypot_ids or "MULE" in n or "EXIT" in n)
+                flagged = set(honeypot_ids)
+                flagged_count = sum(1 for n in neighbours if n in flagged)
                 flagged_neighbour_share = float(flagged_count / len(neighbours))
 
         if close_conn:

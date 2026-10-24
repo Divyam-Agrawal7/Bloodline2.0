@@ -42,4 +42,4 @@ services:
       - key: DETECTOR_URL
         value: https://bloodline-detector.onrender.com
       - key: ADMIN_PASSWORD
-        generateValue: true
+        value: admin123

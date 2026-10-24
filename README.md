@@ -36,7 +36,7 @@ cd ..\bloodline_bank
 
 1. On [render.com](https://render.com), choose **New → Blueprint** and pick this repo.
 2. When it finishes, open `bloodline-bank`'s URL.
-3. The admin password is generated for you. Find it under **bloodline-bank → Environment → `ADMIN_PASSWORD`**.
+3. Log in as admin with `admin` / `admin123` (also shown on the login page). Change it under **bloodline-bank → Environment → `ADMIN_PASSWORD`**.
 
 If Render gives the detector a different hostname than `bloodline-detector.onrender.com`, set the bank's `DETECTOR_URL` to the real one.
 
@@ -49,7 +49,7 @@ Free services sleep after about 15 minutes idle. The first request after that ta
 | Role | Username | Password |
 |---|---|---|
 | Customer | any customer account ID, e.g. `ACC00001` | `demo123` |
-| Admin | `admin` | `admin123` locally; generated on Render |
+| Admin | `admin` | `admin123` (shown on the login page) |
 
 ## What's inside
 
